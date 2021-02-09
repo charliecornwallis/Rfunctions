@@ -4,7 +4,7 @@
 #MCMCglmmProc<-function(model=NULL,S2var=0,start_row=1,workbook=NULL, create_sheet="yes",sheet="Results",title=NULL,fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc=NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4)
 
 #explanation:
-#model = MCMCglmnm model
+#model = MCMCglmm model
 #Does the model have a binary response variable? Changes estimation of random effects and residual variance = fixed
 #S2var = sampling variance if known - useful for meta-analyses
 #start_row=starting row of workbook to add data to if NULL put data in first empty row 
@@ -206,13 +206,52 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   
   #Calculate % variation explained by each random effect
   
+  #Distribution variances
+  link_var<-link
+  link_var[link_var=="gaussian"]<-0
+  link_var[link_var=="logit"]<-pi^2/3
+  link_var[link_var=="probit"]<-1
+  
+  #Setup sampling variances for multi-response models
+  if(length(responses)>1 & sum(S2var) ==0){
+    S2var<-rep(0,length(responses))
+  } else  {S2var<-S2var
+  }
+  
   #Separate variances from each trait for multi-response models and create a var_sum with trait specific values
   icc_all<-mcmc()
+  icc_S2var<-numeric()
   
-  for(i in 1:length(responses)){
-    tvar<-var_terms[,grepl(responses[i],colnames(var_terms))]
+  if(length(responses)>1){
+    
+    for(i in 1:length(responses)){
+      tvar<-var_terms
+      colnames(tvar)<-variances
+      tvar<-tvar[,grepl(responses[i],colnames(tvar))]
+      tsumvar<-rowSums(tvar) #calculate sum of variances
+      tsumvar<-tsumvar + as.numeric(link_var[i]) #Add distribution variance
+      tot_tsumvar<-tsumvar+S2var #Add sampling variance
+      
+      if(any(grepl("animal",colnames(tvar)))) {
+        t_icc<-(tvar/tot_tsumvar)*100
+        #If a phylogeny is included then divide all terms apart from phylogeny by total variance. ICC of phylogeny should exclude sampling variance as phylogenetic relatedness is a "fixed random effect": see Nakagawa & Santos 2012
+      } else  {
+        t_icc<-tvar
+        t_icc[,colnames(t_icc)=="Phylogeny"]<-(t_icc[,colnames(t_icc)=="Phylogeny"]/(tsumvar))*100
+        t_icc[,colnames(t_icc)!="Phylogeny"]<-(t_icc[,colnames(t_icc)!="Phylogeny"]/(tot_tsumvar))*100
+      }
+      
+      icc_all<-cbind(icc_all,t_icc)
+      icc_S2var<-c(icc_S2var,round(((S2var[i]/mean(tot_tsumvar))*100),3))
+      names(icc_S2var)[i]<-paste("Sampling variance",responses[i])
+    }             
+    icc_all<-as.mcmc(icc_all[,-1])
+  } else {
+    
+    tvar<-var_terms
+    colnames(tvar)<-variances
     tsumvar<-rowSums(tvar) #calculate sum of variances
-    tsumvar<-tsumvar + as.numeric(link_var[i]) #Add distribution variance
+    tsumvar<-tsumvar + as.numeric(link_var[1]) #Add distribution variance
     tot_tsumvar<-tsumvar+S2var #Add sampling variance
     
     if(any(grepl("animal",colnames(tvar)))) {
@@ -223,24 +262,22 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
       t_icc[,colnames(t_icc)=="Phylogeny"]<-(t_icc[,colnames(t_icc)=="Phylogeny"]/(tsumvar))*100
       t_icc[,colnames(t_icc)!="Phylogeny"]<-(t_icc[,colnames(t_icc)!="Phylogeny"]/(tot_tsumvar))*100
     }
+    
     icc_all<-cbind(icc_all,t_icc)
+    icc_S2var<-c(icc_S2var,round(((S2var[1]/mean(tot_tsumvar))*100),3))
+    names(icc_S2var)[1]<-paste("Sampling variance",responses[1])
+    icc_all<-as.mcmc(icc_all[,-1])
   }             
-  
-  icc_all<-icc_all[,-1]
   
   #Summaries
   icc1=paste(round(colMeans(icc_all),3)," (",round(HPDinterval(icc_all)[,1],3), " , ",round(HPDinterval(icc_all)[,2],3),")",sep="")
-  icc2=round(((S2var/mean(tot_sum))*100),3)
   
   #Output to excel
   fixed<-data.frame("Fixed Effects"=fixed$Fixed_Effects,"Posterior Mode (CI)"=fixed$Estimates,"pMCMC"=round(as.numeric(fixed$pMCMC),3),check.names=FALSE)
-  randomVar<-data.frame("Random Effects"=c(colnames(var_terms),"Sampling variance"),"Posterior Mode (CI)"=c(rand1,round(S2var,3)),"I2 % (CI)"=c(icc1,icc2), check.names=FALSE)
+  randomVar<-data.frame("Random Effects"=c(colnames(var_terms),names(icc_S2var)),"Posterior Mode (CI)"=c(rand1,round(S2var,3)),"I2 % (CI)"=c(icc1,icc_S2var), check.names=FALSE)
   
-  #Delete sampling variance if not specified
-  if(S2var == 0) {
-    randomVar<-randomVar[randomVar$`Random Effects` != "Sampling variance",]
-  } else  {randomVar<-randomVar
-  }
+  #Remove sampling variances if they weren't specified
+  randomVar<-randomVar[!grepl("Sampling variance",randomVar$`Random Effects`) | randomVar$`Posterior Mode (CI)`!=0,]
   
   #Create excel workbook if not specified
   if(is.null(workbook)) {

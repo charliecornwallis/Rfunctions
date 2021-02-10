@@ -29,7 +29,10 @@
 #For Multi-response models can provide a list of link functions (e.g. c("gaussian","logit")) corresponding to each response trait
 #responses - specify response variables can take multiple values for multi response
 MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,start_row=1,workbook=NULL, create_sheet="yes",sheet="Results",title=NULL,fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PMfix=2)
-{ #Remove unwanted effects
+{ #Load packages
+  pacman::p_load(MCMCglmm,coda)
+  
+  #Remove unwanted effects
   #Remove mev from random effect
   model$VCV<-model$VCV[, colnames(model$VCV) !="sqrt(mev):sqrt(mev).meta"]
   
@@ -240,12 +243,13 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
         t_icc[,colnames(t_icc)=="Phylogeny"]<-(t_icc[,colnames(t_icc)=="Phylogeny"]/(tsumvar))*100
         t_icc[,colnames(t_icc)!="Phylogeny"]<-(t_icc[,colnames(t_icc)!="Phylogeny"]/(tot_tsumvar))*100
       }
-      
+      colnames(t_icc)<-randomvar_names[c(i,i+(length(randomvar_names)/length(responses)))]
       icc_all<-cbind(icc_all,t_icc)
       icc_S2var<-c(icc_S2var,round(((S2var[i]/mean(tot_tsumvar))*100),3))
       names(icc_S2var)[i]<-paste("Sampling variance",responses[i])
     }             
     icc_all<-as.mcmc(icc_all[,-1])
+    
   } else {
     
     tvar<-var_terms
@@ -267,7 +271,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     icc_S2var<-c(icc_S2var,round(((S2var[1]/mean(tot_tsumvar))*100),3))
     names(icc_S2var)[1]<-paste("Sampling variance",responses[1])
     icc_all<-as.mcmc(icc_all[,-1])
+    colnames(icc_all)<-randomvar_names[c(1,1+(length(randomvar_names)/length(responses)))]
   }             
+  icc_all<-icc_all[,order(colnames(var_terms))]
   
   #Summaries
   icc1=paste(round(colMeans(icc_all),3)," (",round(HPDinterval(icc_all)[,1],3), " , ",round(HPDinterval(icc_all)[,2],3),")",sep="")

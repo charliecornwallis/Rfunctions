@@ -24,11 +24,11 @@
 #randomcovar_names = what you want random effect covariances to be called. Note for correlations to be calculated this has to be same as variance1 : variance2
 #Include_random = should random effects be included in output
 #Padding = space between tables when outputting multiple models to same sheet
-#dec_PMfix = number of decimals given for posterior mode and CIs of fixed effects
+#dec_PM = number of decimals given for posterior mode and CIs of fixed and random effects
 #link = allows logit & probit, the default is gaussian, and is used to calculate ICCs correctly. Gaussian can also be used for poisson (log) models to produce ICCs on expected scale but NOT for data scale estimates. See de Villemereuil 2016 Genetics & QGglmm package for details.
 #For Multi-response models can provide a list of link functions (e.g. c("gaussian","logit")) corresponding to each response trait
 #responses - specify response variables can take multiple values for multi response
-MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,start_row=1,workbook=NULL, create_sheet="yes",sheet="Results",title=NULL,fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PMfix=2)
+MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,start_row=1,workbook=NULL, create_sheet="yes",sheet="Results",title=NULL,fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2)
 { #Load packages
   pacman::p_load(MCMCglmm,coda)
   
@@ -56,7 +56,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   #****************************************************
   #Main effects
   nF=model$Fixed$nfl
-  fe1=paste(round(posterior.mode(model$Sol),dec_PMfix)," (",round(HPDinterval(model$Sol)[,1],dec_PMfix), " , ",round(HPDinterval(model$Sol)[,2],dec_PMfix),")",sep="")
+  fe1=paste(round(posterior.mode(model$Sol),dec_PM)," (",round(HPDinterval(model$Sol)[,1],dec_PM), " , ",round(HPDinterval(model$Sol)[,2],dec_PM),")",sep="")
   
   #P values using summary.MCMCglmm code
   fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
@@ -86,7 +86,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
                               colnames(x)[col.diffs[, 2]], sep = "")
     ndiffs<-dim(result)[2]
     result<-as.mcmc(result)
-    fe2=paste(round(posterior.mode(result),dec_PMfix)," (",round(HPDinterval(result)[,1],dec_PMfix), " , ",round(HPDinterval(result)[,2],dec_PMfix),")",sep="")
+    fe2=paste(round(posterior.mode(result),dec_PM)," (",round(HPDinterval(result)[,1],dec_PM), " , ",round(HPDinterval(result)[,2],dec_PM),")",sep="")
     fe2_p=pmax(0.5/dim(result)[1], pmin(colSums(result[,1:ndiffs, drop = FALSE] > 0)/dim(result)[1], 1 - colSums(result[, 1:ndiffs, drop = FALSE] > 0)/dim(result)[1]))*2
     fe2=data.frame(Fixed_Effects=colnames(result),Estimates=fe2, pMCMC=fe2_p, check.names=FALSE)
     return(fe2)
@@ -177,7 +177,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
                                 colnames(x)[col.diffs[, 2]], sep = "")
       ndiffs<-dim(result)[2]
       result<-as.mcmc(result)
-      fe2=paste(round(posterior.mode(result),dec_PMfix)," (",round(HPDinterval(result)[,1],dec_PMfix), " , ",round(HPDinterval(result)[,2],dec_PMfix),")",sep="")
+      fe2=paste(round(posterior.mode(result),dec_PM)," (",round(HPDinterval(result)[,1],dec_PM), " , ",round(HPDinterval(result)[,2],dec_PM),")",sep="")
       fe2_p=pmax(0.5/dim(result)[1], pmin(colSums(result[,1:ndiffs, drop = FALSE] > 0)/dim(result)[1], 1 - colSums(result[, 1:ndiffs, drop = FALSE] > 0)/dim(result)[1]))*2
       fe2=data.frame(Fixed_Effects=colnames(result),Estimates=fe2, pMCMC=fe2_p, check.names=FALSE)
       return(fe2)
@@ -205,7 +205,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   #****************************************************
   #Variance output
   #Summary of variance components
-  rand1=paste(round(posterior.mode(var_terms),3)," (",round(HPDinterval(var_terms)[,1],3), " , ",round(HPDinterval(var_terms)[,2],3),")",sep="")
+  rand1=paste(round(posterior.mode(var_terms),dec_PM)," (",round(HPDinterval(var_terms)[,1],dec_PM), " , ",round(HPDinterval(var_terms)[,2],dec_PM),")",sep="")
   
   #Calculate % variation explained by each random effect
   
@@ -245,7 +245,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
       }
       colnames(t_icc)<-randomvar_names[c(i,i+(length(randomvar_names)/length(responses)))]
       icc_all<-cbind(icc_all,t_icc)
-      icc_S2var<-c(icc_S2var,round(((S2var[i]/mean(tot_tsumvar))*100),3))
+      icc_S2var<-c(icc_S2var,round(((S2var[i]/mean(tot_tsumvar))*100),dec_PM))
       names(icc_S2var)[i]<-paste("Sampling variance",responses[i])
     }             
     icc_all<-as.mcmc(icc_all[,-1])
@@ -268,7 +268,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     }
     
     icc_all<-cbind(icc_all,t_icc)
-    icc_S2var<-c(icc_S2var,round(((S2var[1]/mean(tot_tsumvar))*100),3))
+    icc_S2var<-c(icc_S2var,round(((S2var[1]/mean(tot_tsumvar))*100),dec_PM))
     names(icc_S2var)[1]<-paste("Sampling variance",responses[1])
     icc_all<-as.mcmc(icc_all[,-1])
     colnames(icc_all)<-randomvar_names[c(1,1+(length(randomvar_names)/length(responses)))]
@@ -276,11 +276,11 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   icc_all<-icc_all[,order(colnames(var_terms))]
   
   #Summaries
-  icc1=paste(round(colMeans(icc_all),3)," (",round(HPDinterval(icc_all)[,1],3), " , ",round(HPDinterval(icc_all)[,2],3),")",sep="")
+  icc1=paste(round(colMeans(icc_all),dec_PM)," (",round(HPDinterval(icc_all)[,1],dec_PM), " , ",round(HPDinterval(icc_all)[,2],dec_PM),")",sep="")
   
   #Output to excel
   fixed<-data.frame("Fixed Effects"=fixed$Fixed_Effects,"Posterior Mode (CI)"=fixed$Estimates,"pMCMC"=round(as.numeric(fixed$pMCMC),3),check.names=FALSE)
-  randomVar<-data.frame("Random Effects"=c(colnames(var_terms),names(icc_S2var)),"Posterior Mode (CI)"=c(rand1,round(S2var,3)),"I2 % (CI)"=c(icc1,icc_S2var), check.names=FALSE)
+  randomVar<-data.frame("Random Effects"=c(colnames(var_terms),names(icc_S2var)),"Posterior Mode (CI)"=c(rand1,round(S2var,dec_PM)),"I2 % (CI)"=c(icc1,icc_S2var), check.names=FALSE)
   
   #Remove sampling variances if they weren't specified
   randomVar<-randomVar[!grepl("Sampling variance",randomVar$`Random Effects`) | randomVar$`Posterior Mode (CI)`!=0,]
@@ -365,7 +365,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     }
     corrs<-as.mcmc(corrs[,-1])
     #Cor Summaries
-    cor1=paste(round(posterior.mode(corrs),3)," (",round(HPDinterval(corrs)[,1],3), " , ",round(HPDinterval(corrs)[,2],3),")",sep="")
+    cor1=paste(round(posterior.mode(corrs),dec_PM)," (",round(HPDinterval(corrs)[,1],dec_PM), " , ",round(HPDinterval(corrs)[,2],dec_PM),")",sep="")
     ncors<-ifelse(is.null(dim(corrs)), 1,dim(corrs)[2])
     nits<-ifelse(is.null(dim(corrs)),length(corrs), dim(corrs)[1])
     if(ncors >1){

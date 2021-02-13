@@ -231,7 +231,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
       tvar<-var_terms
       colnames(tvar)<-variances
       tvar<-tvar[,grepl(responses[i],colnames(tvar))]
-      tsumvar<-rowSums(tvar) #calculate sum of variances
+      tsumvar<-rowSums(tvar) #Calculate sum of variances
       tsumvar<-tsumvar + as.numeric(link_var[i]) #Add distribution variance
       tot_tsumvar<-tsumvar+S2var #Add sampling variance
       
@@ -240,10 +240,10 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
         #If a phylogeny is included then divide all terms apart from phylogeny by total variance. ICC of phylogeny should exclude sampling variance as phylogenetic relatedness is a "fixed random effect": see Nakagawa & Santos 2012
       } else  {
         t_icc<-tvar
-        t_icc[,colnames(t_icc)=="Phylogeny"]<-(t_icc[,colnames(t_icc)=="Phylogeny"]/(tsumvar))*100
-        t_icc[,colnames(t_icc)!="Phylogeny"]<-(t_icc[,colnames(t_icc)!="Phylogeny"]/(tot_tsumvar))*100
+        t_icc[,grepl("animal",colnames(t_icc))]<-(t_icc[,grepl("animal",colnames(t_icc))]/(tsumvar))*100
+        t_icc[,!grepl("animal",colnames(t_icc))]<-(t_icc[,!grepl("animal",colnames(t_icc))]/(tot_tsumvar))*100
       }
-      colnames(t_icc)<-randomvar_names[c(i,i+(length(randomvar_names)/length(responses)))]
+      colnames(t_icc)<-randomvar_names[c(i,(i+(length(randomvar_names)/(1+length(model$Random$nrt)))))]#Need to rename colnames to match randomvar_names
       icc_all<-cbind(icc_all,t_icc)
       icc_S2var<-c(icc_S2var,round(((S2var[i]/mean(tot_tsumvar))*100),dec_PM))
       names(icc_S2var)[i]<-paste("Sampling variance",responses[i])
@@ -263,17 +263,18 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
       #If a phylogeny is included then divide all terms apart from phylogeny by total variance. ICC of phylogeny should exclude sampling variance as phylogenetic relatedness is a "fixed random effect": see Nakagawa & Santos 2012
     } else  {
       t_icc<-tvar
-      t_icc[,colnames(t_icc)=="Phylogeny"]<-(t_icc[,colnames(t_icc)=="Phylogeny"]/(tsumvar))*100
-      t_icc[,colnames(t_icc)!="Phylogeny"]<-(t_icc[,colnames(t_icc)!="Phylogeny"]/(tot_tsumvar))*100
+      t_icc[,grepl("animal",colnames(t_icc))]<-(t_icc[,grepl("animal",colnames(t_icc))]/(tsumvar))*100
+      t_icc[,!grepl("animal",colnames(t_icc))]<-(t_icc[,!grepl("animal",colnames(t_icc))]/(tot_tsumvar))*100
     }
     
-    icc_all<-cbind(icc_all,t_icc)
+    icc_all<-t_icc
+    icc_all<-as.mcmc(icc_all[,-1])
+    colnames(t_icc)<-randomvar_names[c(1,(1+(length(randomvar_names)/(1+length(model$Random$nrt)))))]#Need to rename colnames to match randomvar_names
     icc_S2var<-c(icc_S2var,round(((S2var[1]/mean(tot_tsumvar))*100),dec_PM))
     names(icc_S2var)[1]<-paste("Sampling variance",responses[1])
-    icc_all<-as.mcmc(icc_all[,-1])
-    colnames(icc_all)<-randomvar_names[c(1,1+(length(randomvar_names)/length(responses)))]
   }             
-  icc_all<-icc_all[,order(colnames(var_terms))]
+  colnames(icc_all)
+  icc_all<-icc_all[,colnames(var_terms)]#Reorder to match variances
   
   #Summaries
   icc1=paste(round(colMeans(icc_all),dec_PM)," (",round(HPDinterval(icc_all)[,1],dec_PM), " , ",round(HPDinterval(icc_all)[,2],dec_PM),")",sep="")

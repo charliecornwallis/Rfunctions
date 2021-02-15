@@ -14,7 +14,7 @@
 #title = Title of table in e.g. "Table 1"
 #fixed_names = what you want fixed effects to be called e.g c("Intercept","Season length")
 #fixed_del = any fixed effects that should deleted from output - useful if only assessing higher order interactions from a model. Also note that if this is specified then column headers will be suppressed in output table
-#fixed_grp = vector that specifies which differences between fixed effects should be calculated. Needs to be the same length as fixed_names. If not included then all differences will be calculated. 
+#fixed_grp = vector that specifies which differences between fixed effects should be calculated. Needs to be the same length as fixed_names. If not included then all differences will be calculated. e.g. c(1,1,1,2,2,2)
 #fixed_diffdel = specify comparisons between fixed effects that should be removed from output e.g. c("effect1 vs effect2","effect3 vs effect4"). Must exactly match names of fixed effects and be separate by " vs "
 #fixed_diffinc = same as fixed_diffdel but for specific terms to be included in output
 #fixed_diff_diffs = calculates differences between differences e.g. c("effect1 vs effect2 - effect3 vs effect4"). Must exactly match names of fixed effects and be separate by " - "
@@ -266,14 +266,12 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
       t_icc[,grepl("animal",colnames(t_icc))]<-(t_icc[,grepl("animal",colnames(t_icc))]/(tsumvar))*100
       t_icc[,!grepl("animal",colnames(t_icc))]<-(t_icc[,!grepl("animal",colnames(t_icc))]/(tot_tsumvar))*100
     }
-    
     icc_all<-t_icc
-    icc_all<-as.mcmc(icc_all[,-1])
-    colnames(t_icc)<-randomvar_names[c(1,(1+(length(randomvar_names)/(1+length(model$Random$nrt)))))]#Need to rename colnames to match randomvar_names
+    colnames(icc_all)<-randomvar_names[c(1,(1+(length(randomvar_names)/(1+length(model$Random$nrt)))))]#Need to rename colnames to match randomvar_names
     icc_S2var<-c(icc_S2var,round(((S2var[1]/mean(tot_tsumvar))*100),dec_PM))
     names(icc_S2var)[1]<-paste("Sampling variance",responses[1])
   }             
-  colnames(icc_all)
+  
   icc_all<-icc_all[,colnames(var_terms)]#Reorder to match variances
   
   #Summaries

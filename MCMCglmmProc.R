@@ -213,6 +213,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   #Distribution variances
   link_var<-link
   link_var[link_var=="gaussian"]<-0
+  link_var[link_var=="poisson"]<-0
   link_var[link_var=="logit"]<-pi^2/3
   link_var[link_var=="probit"]<-1
   

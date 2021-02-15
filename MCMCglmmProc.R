@@ -199,6 +199,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   #rename random effects if specified
   if(is.null(randomvar_names)) {
     colnames(var_terms)<- colnames(var_terms)
+    randomvar_names<-variances
   } else  {colnames(var_terms)<-randomvar_names
   }
   
@@ -267,7 +268,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
       t_icc[,!grepl("animal",colnames(t_icc))]<-(t_icc[,!grepl("animal",colnames(t_icc))]/(tot_tsumvar))*100
     }
     icc_all<-t_icc
-    colnames(icc_all)<-randomvar_names[c(1,(1+(length(randomvar_names)/(1+length(model$Random$nrt)))))]#Need to rename colnames to match randomvar_names
+    colnames(icc_all)<-randomvar_names#Need to rename colnames to match randomvar_names
     icc_S2var<-c(icc_S2var,round(((S2var[1]/mean(tot_tsumvar))*100),dec_PM))
     names(icc_S2var)[1]<-paste("Sampling variance",responses[1])
   }             

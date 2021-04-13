@@ -1,11 +1,10 @@
 ########################################
 #Function for processing MCMCglmm models
 ########################################
-#MCMCglmmProc<-function(model=NULL,S2var=0,start_row=1,workbook=NULL, create_sheet="yes",sheet="Results",title=NULL,fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc=NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4)
-
-#explanation:
+#Explanation:
 #model = MCMCglmm model
-#Does the model have a binary response variable? Changes estimation of random effects and residual variance = fixed
+#response = list of responses (e.g. c(trait1,trait2))
+#link = link functions used for each response variable (e.g. c("logit","gaussian")). Changes the calculation of ICCs by adding distribution variances.
 #S2var = sampling variance if known - useful for meta-analyses
 #start_row=starting row of workbook to add data to if NULL put data in first empty row 
 #workbook = adds data if specified, otherwise will make a new e.g. Results

@@ -18,8 +18,8 @@
 #fixed_diffdel = specify comparisons between fixed effects that should be removed from output e.g. c("effect1 vs effect2","effect3 vs effect4"). Must exactly match names of fixed effects and be separate by " vs "
 #fixed_diffinc = same as fixed_diffdel but for specific terms to be included in output
 #fixed_diff_diffs = calculates differences between differences e.g. c("effect1 vs effect2 - effect3 vs effect4"). Must exactly match names of fixed effects and be separate by " - "
-#variances = names of variance terms in VCV object either indices or written. Must be as they appear in the model object not the renamed
-#covariances = names of covariance terms in VCV object either indices or written. Must be as they appear in the model object not the renamed
+#variances = names of variance terms in VCV object either indices or written. Must be as they appear in the model object not the renamed. If left as NULL then taken from the model object.
+#covariances = names of covariance terms in VCV object either indices or written. Must be as they appear in the model object not the renamed. If left as NULL then they are not outputted.
 #randomvar_names = what you want random effect variances to be called. Note reserved term animal is renamed to phylogeny
 #randomcovar_names = what you want random effect covariances to be called. Note for correlations to be calculated this has to be same as variance1 : variance2
 #Include_random = should random effects be included in output
@@ -28,7 +28,7 @@
 #link = allows logit & probit, the default is gaussian, and is used to calculate ICCs correctly. Gaussian can also be used for poisson (log) models to produce ICCs on expected scale but NOT for data scale estimates. See de Villemereuil 2016 Genetics & QGglmm package for details.
 #For Multi-response models can provide a list of link functions (e.g. c("gaussian","logit")) corresponding to each response trait
 #responses - specify response variables can take multiple values for multi response
-MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,start_row=1,workbook=NULL, create_sheet="yes",sheet="Results",title=NULL,fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2)
+MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2)
 { #Load packages
   pacman::p_load(MCMCglmm,coda)
   
@@ -42,15 +42,6 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   } else  {colnames(model$Sol)<-fixed_names
   }
   
-  #if variances and covariances are not specified make them the same as random names
-  if(is.null(variances)) {
-    variances<-randomvar_names
-  } else  {variances<-variances
-  }
-  if(is.null(covariances)) {
-    covariances<-randomcovar_names
-  } else  {covariances<-covariances
-  }
   #****************************************************
   #Fixed effects and Differences between levels
   #****************************************************
@@ -193,6 +184,20 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   #****************************************************
   #Random effects
   #****************************************************
+  #if variances are not specified make them the same as those in the model
+  if(is.null(variances)) {
+    variances<-colnames(model$VCV)
+    if(length(responses)>1){
+      var_ids<-seq(from=1,to=length(responses)^2,by=length(responses)+1)#indices of variances
+      for(i in 1:length(model$Random$nrt)+1){ #The indices corresponding to each response variable
+        var_ids<-c(var_ids,var_ids+max(var_ids))
+      }
+      variances<-variances[var_ids]#Pick out variances
+    } else  {variances<-colnames(model$VCV)#if single response model then all random effects assumed to be variances. Might not always be the case (e.g. for random regression ) in which case variances and covariance need to be specified
+    } 
+  } else  {variances<-variances
+  }
+
   #Separate out variance and covariance terms
   var_terms<-model$VCV[,variances]
   
@@ -330,6 +335,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     workbook=workbook
   }
   
+  #****************************************************
   #Random effects: correlations
   #****************************************************
   #Covariance output - correlations
@@ -339,6 +345,11 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     return(workbook)
   }
   else  {
+    #Covariance identification if not specified
+    if(is.null(covariances)) {
+      covariances<-colnames(model$VCV)[colnames(model$VCV) != variances]
+    } else  {covariances<-covariances
+    }
     covar_terms<-as.mcmc(as.matrix((model$VCV[,covariances])))
     colnames(covar_terms)<-randomcovar_names
     
@@ -348,6 +359,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     } else  {
       colnames(covar_terms)<-randomcovar_names
     }
+    
     #Need to pull out variances relating to covariances and cycle through covariance terms to calculate correlations
     corrs=matrix(0, nrow = dim(covar_terms)[1], ncol = 1)
     for(i in 1:dim(covar_terms)[2]) {

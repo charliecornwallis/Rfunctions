@@ -46,7 +46,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   #****************************************************
   #Main effects
   nF=model$Fixed$nfl
-  fe1=paste(round(posterior.mode(model$Sol),dec_PM)," (",round(HPDinterval(model$Sol)[,1],dec_PM), " , ",round(HPDinterval(model$Sol)[,2],dec_PM),")",sep="")
+  fe1=paste(round(posterior.mode(model$Sol),dec_PM)," (",round(HPDinterval(model$Sol)[,1],dec_PM), ", ",round(HPDinterval(model$Sol)[,2],dec_PM),")",sep="")
   
   #P values using summary.MCMCglmm code
   fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
@@ -76,7 +76,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
                               colnames(x)[col.diffs[, 2]], sep = "")
     ndiffs<-dim(result)[2]
     result<-as.mcmc(result)
-    fe2=paste(round(posterior.mode(result),dec_PM)," (",round(HPDinterval(result)[,1],dec_PM), " , ",round(HPDinterval(result)[,2],dec_PM),")",sep="")
+    fe2=paste(round(posterior.mode(result),dec_PM)," (",round(HPDinterval(result)[,1],dec_PM), ", ",round(HPDinterval(result)[,2],dec_PM),")",sep="")
     fe2_p=pmax(0.5/dim(result)[1], pmin(colSums(result[,1:ndiffs, drop = FALSE] > 0)/dim(result)[1], 1 - colSums(result[, 1:ndiffs, drop = FALSE] > 0)/dim(result)[1]))*2
     fe2=data.frame(Fixed_Effects=colnames(result),Estimates=fe2, pMCMC=fe2_p, check.names=FALSE)
     return(fe2)
@@ -100,7 +100,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     #Combine main effects and differences
     fixed=rbind(fe1,fe2)
   }
-
+  
   #Do any comparisons need to be deleted
   if(any(fixed_diffdel == "none")) {
     fixed=fixed
@@ -167,7 +167,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
                                 colnames(x)[col.diffs[, 2]], sep = "")
       ndiffs<-dim(result)[2]
       result<-as.mcmc(result)
-      fe2=paste(round(posterior.mode(result),dec_PM)," (",round(HPDinterval(result)[,1],dec_PM), " , ",round(HPDinterval(result)[,2],dec_PM),")",sep="")
+      fe2=paste(round(posterior.mode(result),dec_PM)," (",round(HPDinterval(result)[,1],dec_PM), ", ",round(HPDinterval(result)[,2],dec_PM),")",sep="")
       fe2_p=pmax(0.5/dim(result)[1], pmin(colSums(result[,1:ndiffs, drop = FALSE] > 0)/dim(result)[1], 1 - colSums(result[, 1:ndiffs, drop = FALSE] > 0)/dim(result)[1]))*2
       fe2=data.frame(Fixed_Effects=colnames(result),Estimates=fe2, pMCMC=fe2_p, check.names=FALSE)
       return(fe2)
@@ -196,7 +196,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     } 
   } else  {variances<-variances
   }
-
+  
   #Separate out variance and covariance terms
   var_terms<-model$VCV[,variances]
   
@@ -210,7 +210,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   #****************************************************
   #Variance output
   #Summary of variance components
-  rand1=paste(round(posterior.mode(var_terms),dec_PM)," (",round(HPDinterval(var_terms)[,1],dec_PM), " , ",round(HPDinterval(var_terms)[,2],dec_PM),")",sep="")
+  rand1=paste(round(posterior.mode(var_terms),dec_PM)," (",round(HPDinterval(var_terms)[,1],dec_PM), ", ",round(HPDinterval(var_terms)[,2],dec_PM),")",sep="")
   
   #Calculate % variation explained by each random effect
   
@@ -281,10 +281,16 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   icc_all<-icc_all[,colnames(var_terms)]#Reorder to match variances
   
   #Summaries
-  icc1=paste(round(colMeans(icc_all),dec_PM)," (",round(HPDinterval(icc_all)[,1],dec_PM), " , ",round(HPDinterval(icc_all)[,2],dec_PM),")",sep="")
+  icc1=paste(round(colMeans(icc_all),dec_PM)," (",round(HPDinterval(icc_all)[,1],dec_PM), ", ",round(HPDinterval(icc_all)[,2],dec_PM),")",sep="")
   
   #Output to excel
-  fixed<-data.frame("Fixed Effects"=fixed$Fixed_Effects,"Posterior Mode (CI)"=fixed$Estimates,"pMCMC"=round(as.numeric(fixed$pMCMC),3),check.names=FALSE)
+  #Fixed effects
+  fixedeff <- fixed[!grepl(" vs ",fixed$Fixed_Effects),]
+  fixedeff<-data.frame("Fixed Effects"=fixedeff$Fixed_Effects,"Posterior Mode (CI)"=fixedeff$Estimates,"pMCMC"=round(as.numeric(fixedeff$pMCMC),3),check.names=FALSE)
+  #Fixed differences
+  fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
+  fixeddiff<-data.frame("Fixed Effects Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
+  #Random
   randomVar<-data.frame("Random Effects"=c(colnames(var_terms),names(icc_S2var)),"Posterior Mode (CI)"=c(rand1,round(S2var,dec_PM)),"I2 % (CI)"=c(icc1,icc_S2var), check.names=FALSE)
   
   #Remove sampling variances if they weren't specified
@@ -317,9 +323,11 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   #Fixed effects
   #Remove column headings if deleting fixed effects as it will be assessing higher order interactions where column names are not needed
   if(any(fixed_del == "none")) {
-    writeData(workbook, sheet, fixed, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
+    writeData(workbook, sheet, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
+    writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
   } else  {
-    writeData(workbook, sheet, fixed, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2,colNames =FALSE)
+    writeData(workbook, sheet, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2,colNames =FALSE)
+    writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1,headerStyle = hs2,colNames =FALSE)
   }
   
   #Bold pMCMC values less than 0.05
@@ -329,7 +337,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   #Random effects: variances
   #Should they be outputted or not
   if(Include_random == "yes") {
-    writeData(workbook, sheet, randomVar, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixed)[1]+1,headerStyle = hs2)
+    writeData(workbook, sheet, randomVar, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0),headerStyle = hs2)
   } else  {
     workbook=workbook
   }
@@ -377,7 +385,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     }
     corrs<-as.mcmc(corrs[,-1])
     #Cor Summaries
-    cor1=paste(round(posterior.mode(corrs),dec_PM)," (",round(HPDinterval(corrs)[,1],dec_PM), " , ",round(HPDinterval(corrs)[,2],dec_PM),")",sep="")
+    cor1=paste(round(posterior.mode(corrs),dec_PM)," (",round(HPDinterval(corrs)[,1],dec_PM), ", ",round(HPDinterval(corrs)[,2],dec_PM),")",sep="")
     ncors<-ifelse(is.null(dim(corrs)), 1,dim(corrs)[2])
     nits<-ifelse(is.null(dim(corrs)),length(corrs), dim(corrs)[1])
     if(ncors >1){
@@ -388,7 +396,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     randomCorr<-data.frame("Correlations"=colnames(covar_terms),"Posterior Mode (CI)"=cor1,"pMCMC"=round(as.numeric(pCor),3), check.names=FALSE)
     
     #Write data to excel sheet
-    writeData(workbook, sheet, randomCorr, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixed)[1]+dim(randomVar)[1]+padding,headerStyle = hs2)
+    writeData(workbook, sheet, randomCorr, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+padding,headerStyle = hs2)
     conditionalFormatting(workbook, sheet, cols=3, rows=start_row+dim(header)[1]+dim(fixed)[1]+dim(randomVar)[1]+4:10000, rule="<0.05", style = bolding)
   }
   

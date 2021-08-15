@@ -239,7 +239,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
       tvar<-tvar[,grepl(responses[i],colnames(tvar))]
       tsumvar<-rowSums(tvar) #Calculate sum of variances
       tsumvar<-tsumvar + as.numeric(link_var[i]) #Add distribution variance
-      tot_tsumvar<-tsumvar+S2var #Add sampling variance
+      tot_tsumvar<-tsumvar+S2var[i] #Add sampling variance
       
       if(any(grepl("animal",colnames(tvar)))) {
         t_icc<-(tvar/tot_tsumvar)*100
@@ -262,7 +262,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     colnames(tvar)<-variances
     tsumvar<-rowSums(tvar) #calculate sum of variances
     tsumvar<-tsumvar + as.numeric(link_var[1]) #Add distribution variance
-    tot_tsumvar<-tsumvar+S2var #Add sampling variance
+    tot_tsumvar<-tsumvar+S2var[i] #Add sampling variance
     
     if(any(grepl("animal",colnames(tvar)))) {
       t_icc<-(tvar/tot_tsumvar)*100

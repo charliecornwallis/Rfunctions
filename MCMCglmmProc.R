@@ -1,7 +1,9 @@
-########################################
+#***************************************
 #Function for processing MCMCglmm models
-########################################
-#Explanation:
+#***************************************
+
+#Explanation ----
+
 #model = MCMCglmm model
 #response = list of responses (e.g. c(trait1,trait2))
 #link = link functions used for each response variable (e.g. c("logit","gaussian")). Changes the calculation of ICCs by adding distribution variances.
@@ -26,8 +28,36 @@
 #dec_PM = number of decimals given for posterior mode and CIs of fixed and random effects
 #link = allows logit & probit, the default is gaussian, and is used to calculate ICCs correctly. Gaussian can also be used for poisson (log) models to produce ICCs on expected scale but NOT for data scale estimates. See de Villemereuil 2016 Genetics & QGglmm package for details.
 #For Multi-response models can provide a list of link functions (e.g. c("gaussian","logit")) corresponding to each response trait
-#responses - specify response variables can take multiple values for multi response
-MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2)
+#responses = specify response variables can take multiple values for multi response
+#pvalues = exclusion of pMCMC values for fixed effects - "all", "none" or "c(?,?...)" giving list of which p values to exclude. Note pMCMC will still be calculated for fixed effect comparisons
+
+#Trouble shooting tools----
+#model=M4.1.4.1
+#responses=c("ob_host")
+#link=c("logit")
+#fixed_diffinc = c("all")
+#fixed_diff_diff = c(),
+#Include_random = "yes"
+#variances=c("animal","units")
+#covariances =c(""),
+#randomvar_names=c("Phylogeny","Residual")
+#randomcovar_names =c("")
+#padding=3
+#fixed_del="none"
+#fixed_grp=NULL
+#fixed_diffdel="none"
+#fixed_diffinc="all"
+#fixed_diff_diffs =NULL
+#Include_random = "yes"
+#padding=4
+#dec_PM=2
+#pvalues="no"
+#S2var=0
+
+
+#Function ----
+
+MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="yes")
 { #Load packages
   pacman::p_load(MCMCglmm,coda)
   
@@ -49,7 +79,21 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   fe1=paste(round(posterior.mode(model$Sol),dec_PM)," (",round(HPDinterval(model$Sol)[,1],dec_PM), ", ",round(HPDinterval(model$Sol)[,2],dec_PM),")",sep="")
   
   #P values using summary.MCMCglmm code
-  fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
+  #Pvalues = option to exclude 
+  if(length(pvalues) >1) {
+    fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
+    fe1_p=round(as.numeric(fe1_p),3)
+    fe1_p[pvalues]<-"-"
+  } else  {
+  if(pvalues == "none") {
+    fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
+    fe1_p=round(as.numeric(fe1_p),3)
+  } else  {
+      fe1_p=rep("-",length(fixed_names))
+    }
+  }
+
+
   fe1=data.frame(Fixed_Effects=colnames(model$Sol),Estimates=fe1, pMCMC=fe1_p)
   
   #Do any fixed effects need to be deleted
@@ -78,7 +122,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     result<-as.mcmc(result)
     fe2=paste(round(posterior.mode(result),dec_PM)," (",round(HPDinterval(result)[,1],dec_PM), ", ",round(HPDinterval(result)[,2],dec_PM),")",sep="")
     fe2_p=pmax(0.5/dim(result)[1], pmin(colSums(result[,1:ndiffs, drop = FALSE] > 0)/dim(result)[1], 1 - colSums(result[, 1:ndiffs, drop = FALSE] > 0)/dim(result)[1]))*2
-    fe2=data.frame(Fixed_Effects=colnames(result),Estimates=fe2, pMCMC=fe2_p, check.names=FALSE)
+    fe2=data.frame(Fixed_Effects=colnames(result),Estimates=fe2, pMCMC=round(as.numeric(fe2_p),3), check.names=FALSE)
     return(fe2)
   } 
   }
@@ -169,7 +213,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
       result<-as.mcmc(result)
       fe2=paste(round(posterior.mode(result),dec_PM)," (",round(HPDinterval(result)[,1],dec_PM), ", ",round(HPDinterval(result)[,2],dec_PM),")",sep="")
       fe2_p=pmax(0.5/dim(result)[1], pmin(colSums(result[,1:ndiffs, drop = FALSE] > 0)/dim(result)[1], 1 - colSums(result[, 1:ndiffs, drop = FALSE] > 0)/dim(result)[1]))*2
-      fe2=data.frame(Fixed_Effects=colnames(result),Estimates=fe2, pMCMC=fe2_p, check.names=FALSE)
+      fe2=data.frame(Fixed_Effects=colnames(result),Estimates=fe2, pMCMC=round(as.numeric(fe2_p),3), check.names=FALSE)
       return(fe2)
     } 
     }
@@ -286,7 +330,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   #Output to excel
   #Fixed effects
   fixedeff <- fixed[!grepl(" vs ",fixed$Fixed_Effects),]
-  fixedeff<-data.frame("Fixed Effects"=fixedeff$Fixed_Effects,"Posterior Mode (CI)"=fixedeff$Estimates,"pMCMC"=round(as.numeric(fixedeff$pMCMC),3),check.names=FALSE)
+  fixedeff<-data.frame("Fixed Effects"=fixedeff$Fixed_Effects,"Posterior Mode (CI)"=fixedeff$Estimates,"pMCMC"=fixedeff$pMCMC,check.names=FALSE)
   #Fixed differences
   fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
   fixeddiff<-data.frame("Fixed Effects Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)

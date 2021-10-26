@@ -29,7 +29,7 @@
 #link = allows logit & probit, the default is gaussian, and is used to calculate ICCs correctly. Gaussian can also be used for poisson (log) models to produce ICCs on expected scale but NOT for data scale estimates. See de Villemereuil 2016 Genetics & QGglmm package for details.
 #For Multi-response models can provide a list of link functions (e.g. c("gaussian","logit")) corresponding to each response trait
 #responses = specify response variables can take multiple values for multi response
-#pvalues = exclusion of pMCMC values for fixed effects - "all", "none" or "c(?,?...)" giving list of which p values to exclude. Note pMCMC will still be calculated for fixed effect comparisons
+#pvalues = exclusion of pMCMC values for fixed effects - "exclude", "include" or "c(?,?...)" giving list of which p values to exclude. Note pMCMC will still be calculated for fixed effect comparisons
 
 #Trouble shooting tools----
 #model=M4.1.4.1
@@ -57,7 +57,7 @@
 
 #Function ----
 
-MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="yes")
+MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include")
 { #Load packages
   pacman::p_load(MCMCglmm,coda,openxlsx)
   
@@ -80,20 +80,19 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   
   #P values using summary.MCMCglmm code
   #Pvalues = option to exclude 
-  if(length(pvalues) >1) {
-    fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
-    fe1_p=round(as.numeric(fe1_p),3)
-    fe1_p[pvalues]<-"-"
-  } else  {
-  if(pvalues == "none") {
+  if(pvalues == "include") {
     fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
     fe1_p=round(as.numeric(fe1_p),3)
   } else  {
-      fe1_p=rep("-",length(fixed_names))
-    }
+  if(pvalues == "exclude") {
+     fe1_p=rep("-",length(fixed_names))
+            } else  {
+              fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
+              fe1_p=round(as.numeric(fe1_p),3)
+              fe1_p[pvalues]<-"-"
+            }
   }
-
-
+  
   fe1=data.frame(Fixed_Effects=colnames(model$Sol),Estimates=fe1, pMCMC=fe1_p)
   
   #Do any fixed effects need to be deleted

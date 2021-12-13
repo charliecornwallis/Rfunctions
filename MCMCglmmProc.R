@@ -332,7 +332,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   fixedeff<-data.frame("Fixed Effects"=fixedeff$Fixed_Effects,"Posterior Mode (CI)"=fixedeff$Estimates,"pMCMC"=fixedeff$pMCMC,check.names=FALSE)
   #Fixed differences
   fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
-  fixeddiff<-data.frame("Fixed Effects Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
+  fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
   #Random
   randomVar<-data.frame("Random Effects"=c(colnames(var_terms),names(icc_S2var)),"Posterior Mode (CI)"=c(rand1,round(S2var,dec_PM)),"I2 % (CI)"=c(icc1,icc_S2var), check.names=FALSE)
   
@@ -367,11 +367,23 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   #Remove column headings if deleting fixed effects as it will be assessing higher order interactions where column names are not needed
   if(any(fixed_del == "none")) {
     writeData(workbook, sheet, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
-    writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
+    
+    if(any(fixed_diffinc == "none")) { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
+    } else  {
+      writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
+    }
+    
   } else  {
     writeData(workbook, sheet, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2,colNames =FALSE)
-    writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1,headerStyle = hs2,colNames =FALSE)
+    
+    if(any(fixed_diffinc == "none")) { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
+    } else  {
+      writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1,headerStyle = hs2,colNames =FALSE)
+    }
+
   }
+  
+  
   
   #Bold pMCMC values less than 0.05
   bolding<-createStyle(textDecoration="bold")

@@ -30,6 +30,7 @@
 #For Multi-response models can provide a list of link functions (e.g. c("gaussian","logit")) corresponding to each response trait
 #responses = specify response variables can take multiple values for multi response
 #pvalues = exclusion of pMCMC values for fixed effects - "exclude", "include" or "c(?,?...)" giving list of which p values to exclude. Note pMCMC will still be calculated for fixed effect comparisons
+#levels = if at.level notation is used how many levels are there. Default is 0.
 
 #Trouble shooting tools----
 #model=M4.1.4.1
@@ -53,11 +54,11 @@
 #dec_PM=2
 #pvalues="no"
 #S2var=0
-
+#levels=0
 
 #Function ----
 
-MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include")
+MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",levels=0)
 { #Load packages
   pacman::p_load(MCMCglmm,coda,openxlsx)
   
@@ -84,13 +85,13 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
     fe1_p=round(as.numeric(fe1_p),3)
   } else  {
-  if(pvalues == "exclude") {
-     fe1_p=rep("-",length(fixed_names))
-            } else  {
-              fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
-              fe1_p=round(as.numeric(fe1_p),3)
-              fe1_p[pvalues]<-"-"
-            }
+    if(pvalues == "exclude") {
+      fe1_p=rep("-",length(fixed_names))
+    } else  {
+      fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
+      fe1_p=round(as.numeric(fe1_p),3)
+      fe1_p[pvalues]<-"-"
+    }
   }
   
   fe1=data.frame(Fixed_Effects=colnames(model$Sol),Estimates=fe1, pMCMC=fe1_p)
@@ -292,15 +293,23 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
         t_icc[,grepl("animal",colnames(t_icc))]<-(t_icc[,grepl("animal",colnames(t_icc))]/(tsumvar))*100
         t_icc[,!grepl("animal",colnames(t_icc))]<-(t_icc[,!grepl("animal",colnames(t_icc))]/(tot_tsumvar))*100
       }
-      colnames(t_icc)<-randomvar_names[c(i,(i+(length(randomvar_names)/(1+length(model$Random$nrt)))))]#Need to rename colnames to match randomvar_names
-      icc_all<-cbind(icc_all,t_icc)
-      icc_S2var<-c(icc_S2var,round(((S2var[i]/mean(tot_tsumvar))*100),dec_PM))
-      names(icc_S2var)[i]<-paste("Sampling variance",responses[i])
-    }             
-    icc_all<-as.mcmc(icc_all[,-1])
-    
+      
+      #Need to rename colnames to match randomvar_names & need to account for models with at.level notation
+      if(levels>0) {
+        number_random=length(model$Random$nrt)+levels
+        colnames(t_icc)<-randomvar_names[seq(i,length(randomvar_names),(length(randomvar_names) / number_random))]
+        icc_all<-cbind(icc_all,t_icc)
+        #icc_S2var<-c(icc_S2var,round(((S2var[i]/mean(tot_tsumvar))*100),dec_PM))
+        #names(icc_S2var)[i]<-paste("Sampling variance",responses[i])
+      } else  {
+        colnames(t_icc)<-randomvar_names[c(i,(i+(length(randomvar_names)/(1+length(model$Random$nrt)))))]#Need to rename colnames to match randomvar_names
+        icc_all<-cbind(icc_all,t_icc)
+        icc_S2var<-c(icc_S2var,round(((S2var[i]/mean(tot_tsumvar))*100),dec_PM))
+        names(icc_S2var)[i]<-paste("Sampling variance",responses[i])
+      }             
+    } 
+    #Single response models   
   } else {
-    
     tvar<-var_terms
     colnames(tvar)<-variances
     tsumvar<-rowSums(tvar) #calculate sum of variances
@@ -320,7 +329,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     icc_S2var<-c(icc_S2var,round(((S2var[1]/mean(tot_tsumvar))*100),dec_PM))
     names(icc_S2var)[1]<-paste("Sampling variance",responses[1])
   }             
-  
+  icc_all<-as.mcmc(icc_all[,-1])
   icc_all<-icc_all[,colnames(var_terms)]#Reorder to match variances
   
   #Summaries
@@ -334,10 +343,11 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
   fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
   #Random
-  randomVar<-data.frame("Random Effects"=c(colnames(var_terms),names(icc_S2var)),"Posterior Mode (CI)"=c(rand1,round(S2var,dec_PM)),"I2 % (CI)"=c(icc1,icc_S2var), check.names=FALSE)
-  
-  #Remove sampling variances if they weren't specified
-  randomVar<-randomVar[!grepl("Sampling variance",randomVar$`Random Effects`) | randomVar$`Posterior Mode (CI)`!=0,]
+  if(sum(S2var) ==0){
+    randomVar<-data.frame("Random Effects"=c(colnames(var_terms)),"Posterior Mode (CI)"=c(rand1),"I2 % (CI)"=c(icc1), check.names=FALSE)
+  } else  {
+    randomVar<-data.frame("Random Effects"=c(colnames(var_terms),names(icc_S2var)),"Posterior Mode (CI)"=c(rand1,round(S2var,dec_PM)),"I2 % (CI)"=c(icc1,icc_S2var), check.names=FALSE)
+  }
   
   #Create excel workbook if not specified
   if(is.null(workbook)) {
@@ -380,7 +390,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     } else  {
       writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1,headerStyle = hs2,colNames =FALSE)
     }
-
+    
   }
   
   

@@ -308,8 +308,10 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
         names(icc_S2var)[i]<-paste("Sampling variance",responses[i])
       }             
     } 
-    #Single response models   
+    icc_all<-as.mcmc(icc_all[,-1])
+    
   } else {
+#Single response models   
     tvar<-var_terms
     colnames(tvar)<-variances
     tsumvar<-rowSums(tvar) #calculate sum of variances
@@ -329,7 +331,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     icc_S2var<-c(icc_S2var,round(((S2var[1]/mean(tot_tsumvar))*100),dec_PM))
     names(icc_S2var)[1]<-paste("Sampling variance",responses[1])
   }             
-  icc_all<-as.mcmc(icc_all[,-1])
+
   icc_all<-icc_all[,colnames(var_terms)]#Reorder to match variances
   
   #Summaries

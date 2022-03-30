@@ -3,7 +3,7 @@
 #***************************************
 
 #Explanation ----
-
+.
 #model = MCMCglmm model
 #response = list of responses (e.g. c(trait1,trait2))
 #link = link functions used for each response variable (e.g. c("logit","gaussian")). Changes the calculation of ICCs by adding distribution variances.

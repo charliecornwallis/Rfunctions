@@ -1,5 +1,5 @@
 #***************************************
-#Function for processing MCMCglmm models
+#Function for processing MCMCglmm models#
 #***************************************
 
 #Explanation ----

@@ -33,29 +33,29 @@
 #levels = if at.level notation is used how many levels are there. Default is 0.
 
 #Trouble shooting tools----
-model=M4.2.1.1ns
-responses=c("ob_host","ZavestanCarb", "ZavestanFat","ZavestanProtein","ZavestanEssAA", "ZavestanNonessAA","ZavestanA","ZavestanB","ZavestanE")
-link=c("logit","gaussian","gaussian","gaussian","gaussian","gaussian","gaussian","gaussian","gaussian")
-fixed_names=c("Obligate %","Carbohydrates","Fat","Protein","EssAA","NonEssAA","Vitamin A","Vitamin B","Vitamin E")
-fixed_diffinc = c("all")
-fixed_diff_diff = c()
-Include_random = "yes"
-variances=variances=c("traitob_host:traitob_host.animal","traitZavestanCarb:traitZavestanCarb.animal","traitZavestanProtein:traitZavestanProtein.animal","traitZavestanFat:traitZavestanFat.animal","traitZavestanEssAA:traitZavestanEssAA.animal","traitZavestanNonessAA:traitZavestanNonessAA.animal","traitZavestanA:traitZavestanA.animal","traitZavestanB:traitZavestanB.animal","traitZavestanE:traitZavestanE.animal","traitob_host:traitob_host.units","traitZavestanCarb:traitZavestanCarb.units","traitZavestanProtein:traitZavestanProtein.units","traitZavestanFat:traitZavestanFat.units","traitZavestanEssAA:traitZavestanEssAA.units","traitZavestanNonessAA:traitZavestanNonessAA.units","traitZavestanA:traitZavestanA.units","traitZavestanB:traitZavestanB.units","traitZavestanE:traitZavestanE.units")
-covariances =c("traitZavestanCarb:traitob_host.animal","traitZavestanProtein:traitob_host.animal","traitZavestanFat:traitob_host.animal","traitZavestanEssAA:traitob_host.animal","traitZavestanNonessAA:traitob_host.animal","traitZavestanA:traitob_host.animal","traitZavestanB:traitob_host.animal","traitZavestanE:traitob_host.animal","traitZavestanCarb:traitob_host.units","traitZavestanProtein:traitob_host.units","traitZavestanFat:traitob_host.units","traitZavestanEssAA:traitob_host.units","traitZavestanNonessAA:traitob_host.units","traitZavestanA:traitob_host.units","traitZavestanB:traitob_host.units","traitZavestanE:traitob_host.units")
-randomvar_names=c("Phylogeny Obligate","Phylogeny Carbs","Phylogeny Protein","Phylogeny Fat","Phylogeny EssAA","Phylogeny NonEssAA","Phylogeny Vit A", "Phylogeny Vit B","Phylogeny Vit E","Residual Obligate","Residual Carbs","Residual Protein","Residual Fat","Residual EssAA","Residual NonEssAA","Residual Vit A","Residual Vit B","Residual Vit E")
-randomcovar_names =c("Phylogeny Carbs : Phylogeny Obligate","Phylogeny Protein : Phylogeny Obligate"," Phylogeny Fat : Phylogeny Obligate","Phylogeny EssAA : Phylogeny Obligate","Phylogeny NonEssAA : Phylogeny Obligate","Phylogeny Vit A : Phylogeny Obligate","Phylogeny Vit B : Phylogeny Obligate","Phylogeny Vit E : Phylogeny Obligate","Residual Carbs : Residual Obligate","Residual Protein : Residual Obligate"," Residual Fat : Residual Obligate","Residual EssAA : Residual Obligate","Residual NonEssAA : Residual Obligate","Residual Vit A : Residual Obligate","Residual Vit B : Residual Obligate","Residual Vit E : Residual Obligate")
-padding=3
-fixed_del="none"
-fixed_grp=NULL
-fixed_diffdel="none"
-fixed_diffinc="all"
-fixed_diff_diffs =NULL
-Include_random = "yes"
-padding=4
-dec_PM=2
-pvalues="exclude"
-S2var=0
-levels=0
+# model=M4.2.1.1ns
+# responses=c("ob_host","ZavestanCarb", "ZavestanFat","ZavestanProtein","ZavestanEssAA", "ZavestanNonessAA","ZavestanA","ZavestanB","ZavestanE")
+# link=c("logit","gaussian","gaussian","gaussian","gaussian","gaussian","gaussian","gaussian","gaussian")
+# fixed_names=c("Obligate %","Carbohydrates","Fat","Protein","EssAA","NonEssAA","Vitamin A","Vitamin B","Vitamin E")
+# fixed_diffinc = c("all")
+# fixed_diff_diff = c()
+# Include_random = "yes"
+# variances=variances=c("traitob_host:traitob_host.animal","traitZavestanCarb:traitZavestanCarb.animal","traitZavestanProtein:traitZavestanProtein.animal","traitZavestanFat:traitZavestanFat.animal","traitZavestanEssAA:traitZavestanEssAA.animal","traitZavestanNonessAA:traitZavestanNonessAA.animal","traitZavestanA:traitZavestanA.animal","traitZavestanB:traitZavestanB.animal","traitZavestanE:traitZavestanE.animal","traitob_host:traitob_host.units","traitZavestanCarb:traitZavestanCarb.units","traitZavestanProtein:traitZavestanProtein.units","traitZavestanFat:traitZavestanFat.units","traitZavestanEssAA:traitZavestanEssAA.units","traitZavestanNonessAA:traitZavestanNonessAA.units","traitZavestanA:traitZavestanA.units","traitZavestanB:traitZavestanB.units","traitZavestanE:traitZavestanE.units")
+# covariances =c("traitZavestanCarb:traitob_host.animal","traitZavestanProtein:traitob_host.animal","traitZavestanFat:traitob_host.animal","traitZavestanEssAA:traitob_host.animal","traitZavestanNonessAA:traitob_host.animal","traitZavestanA:traitob_host.animal","traitZavestanB:traitob_host.animal","traitZavestanE:traitob_host.animal","traitZavestanCarb:traitob_host.units","traitZavestanProtein:traitob_host.units","traitZavestanFat:traitob_host.units","traitZavestanEssAA:traitob_host.units","traitZavestanNonessAA:traitob_host.units","traitZavestanA:traitob_host.units","traitZavestanB:traitob_host.units","traitZavestanE:traitob_host.units")
+# randomvar_names=c("Phylogeny Obligate","Phylogeny Carbs","Phylogeny Protein","Phylogeny Fat","Phylogeny EssAA","Phylogeny NonEssAA","Phylogeny Vit A", "Phylogeny Vit B","Phylogeny Vit E","Residual Obligate","Residual Carbs","Residual Protein","Residual Fat","Residual EssAA","Residual NonEssAA","Residual Vit A","Residual Vit B","Residual Vit E")
+# randomcovar_names =c("Phylogeny Carbs : Phylogeny Obligate","Phylogeny Protein : Phylogeny Obligate"," Phylogeny Fat : Phylogeny Obligate","Phylogeny EssAA : Phylogeny Obligate","Phylogeny NonEssAA : Phylogeny Obligate","Phylogeny Vit A : Phylogeny Obligate","Phylogeny Vit B : Phylogeny Obligate","Phylogeny Vit E : Phylogeny Obligate","Residual Carbs : Residual Obligate","Residual Protein : Residual Obligate"," Residual Fat : Residual Obligate","Residual EssAA : Residual Obligate","Residual NonEssAA : Residual Obligate","Residual Vit A : Residual Obligate","Residual Vit B : Residual Obligate","Residual Vit E : Residual Obligate")
+# padding=3
+# fixed_del="none"
+# fixed_grp=NULL
+# fixed_diffdel="none"
+# fixed_diffinc="all"
+# fixed_diff_diffs =NULL
+# Include_random = "yes"
+# padding=4
+# dec_PM=2
+# pvalues="exclude"
+# S2var=0
+# levels=0
 
 #Function ----
 

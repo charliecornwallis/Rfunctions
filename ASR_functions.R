@@ -340,7 +340,7 @@ trans_scm<-function(trees,scm_model,dat,trait_raw,state1,state2,cutoff = 0.5){
     
     pred_states<-rbind(nodes_tots,tip_tots)
     pred_states$prob<-pred_states$state1/(pred_states$state1+pred_states$state2)
-    pred_states$state<-ifelse(pred_states$prob>cutoff,state2,ifelse(pred_states$prob<(1-cutoff),state1,"Unknown"))
+    pred_states$state<-ifelse(pred_states$prob>cutoff,state1,ifelse(pred_states$prob<(1-cutoff),state2,"Unknown"))
     
     #Create a dataset with ancestors and descendants
     tree_df<-tidytree::as_tibble(trees)
@@ -393,6 +393,7 @@ trans_scm<-function(trees,scm_model,dat,trait_raw,state1,state2,cutoff = 0.5){
     return(data)
   }
 }  
+
 
 #******************************************************************************************
 #corHMM models run on list of trees

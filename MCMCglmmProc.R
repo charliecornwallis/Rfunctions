@@ -57,11 +57,17 @@
 # S2var=0
 # levels=0
 
+#Naming aid ----
+#variances=c("trait1:trait1.animal","trait2:trait2.animal","trait3:trait3.animal","trait4:trait4.animal","trait5:trait5.animal","trait6:trait6.animal","trait7:trait7.animal","trait8:trait8.animal","trait9:trait9.animal","trait1:trait1.units","trait2:trait2.units","trait3:trait3.units","trait4:trait4.units","trait5:trait5.units","trait6:trait6.units","trait7:trait7.units","trait8:trait8.units","trait9:trait9.units"),
+#covariances =c("trait2:trait1.animal","trait3:trait1.animal","trait4:trait1.animal","trait5:trait1.animal","trait6:trait1.animal","trait7:trait1.animal","trait8:trait1.animal","trait9:trait1.animal","trait2:trait1.units","trait3:trait1.units","trait4:trait1.units","trait5:trait1.units","trait6:trait1.units","trait7:trait1.units","trait8:trait1.units","trait9:trait1.units"),
+#randomvar_names=c("Phylogeny Trait1","Phylogeny Trait2","Phylogeny Trait3","Phylogeny Trait4","Phylogeny Trait5","Phylogeny Trait6","Phylogeny Trait7", "Phylogeny Trait8","Phylogeny Trait9","Residual Trait1","Residual Trait2","Residual Trait3","Residual Trait4","Residual Trait5","Residual Trait6","Residual Trait7","Residual Trait8","Residual Trait9"),
+#randomcovar_names =c("Phylogeny Trait2 : Phylogeny Trait1","Phylogeny Trait3 : Phylogeny Trait1","Phylogeny Trait4 : Phylogeny Trait1","Phylogeny Trait5 : Phylogeny Trait1","Phylogeny Trait6 : Phylogeny Trait1","Phylogeny Trait7 : Phylogeny Trait1","Phylogeny Trait8 : Phylogeny Trait1","Phylogeny Trait9 : Phylogeny Trait1","Residual Trait2 : Residual Trait1","Residual Trait3 : Residual Trait1","Residual Trait4 : Residual Trait1","Residual Trait5 : Residual Trait1","Residual Trait6 : Residual Trait1","Residual Trait7 : Residual Trait1","Residual Trait8 : Residual Trait1","Residual Trait9 : Residual Trait1"),
+
 #Function ----
 
 MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",levels=0)
 { #Load packages
-  pacman::p_load(MCMCglmm,coda,openxlsx)
+  pacman::p_load(MCMCglmm,coda,openxlsx,stringdist)
   
   #Remove unwanted effects
   #Remove mev from random effect

@@ -304,12 +304,12 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
       #Need to rename colnames to match randomvar_names & need to account for models with at.level notation
       if(levels>0) {
         number_random=length(model$Random$nfl)+levels
-        colnames(t_icc)<-randomvar_names[seq(i,length(randomvar_names),(length(randomvar_names) / number_random))]
+        colnames(t_icc)<-randomvar_names[seq(from=i,to=i+length(responses)*number_random,by=length(responses))]
         icc_all<-cbind(icc_all,t_icc)
         #icc_S2var<-c(icc_S2var,round(((S2var[i]/mean(tot_tsumvar))*100),dec_PM))
         #names(icc_S2var)[i]<-paste("Sampling variance",responses[i])
       } else  {
-        colnames(t_icc)<-randomvar_names[c(i,(i+(length(randomvar_names)/(1+length(model$Random$nfl)))))]#Need to rename colnames to match randomvar_names
+        colnames(t_icc)<-randomvar_names[seq(from=i,to=i+length(responses)*length(model$Random$nfl),by=length(responses))]
         icc_all<-cbind(icc_all,t_icc)
         icc_S2var<-c(icc_S2var,round(((S2var[i]/mean(tot_tsumvar))*100),dec_PM))
         names(icc_S2var)[i]<-paste("Sampling variance",responses[i])

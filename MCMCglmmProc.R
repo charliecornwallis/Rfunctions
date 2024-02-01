@@ -29,7 +29,7 @@
 
 #Function ----
 
-MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",levels=0)
+MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",levels=0)
 { 
   #Explanation of terms
   #model = MCMCglmm model
@@ -72,6 +72,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   #Remove unwanted effects
   #Remove mev from random effect
   model$VCV<-model$VCV[, colnames(model$VCV) !="sqrt(mev):sqrt(mev).meta"]
+  
+  #rename phylogeny or pedigree term (ginv=) to animal
+  colnames(model$VCV) <- sub(ginv, "animal", colnames(model$VCV))
   
   #rename model fixed effects
   if(is.null(fixed_names)) {
@@ -280,7 +283,6 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
   
   #Separate variances from each trait for multi-response models and create a var_sum with trait specific values
   icc_all<-mcmc()
-  icc_S2var<-numeric()
   
   if(length(responses)>1){
     
@@ -303,22 +305,19 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
       
       #Need to rename colnames to match randomvar_names & need to account for models with at.level notation
       if(levels>0) {
-        number_random=length(model$Random$nfl)+levels
-        colnames(t_icc)<-randomvar_names[seq(from=i,to=i+length(responses)*number_random,by=length(responses))]
+        number_random=length(model$Random$nfl)+levels #+levels to add residual variance
+        colnames(t_icc)<-randomvar_names[seq(from=i,to=number_random*length(responses),by=length(responses))]
         icc_all<-cbind(icc_all,t_icc)
-        #icc_S2var<-c(icc_S2var,round(((S2var[i]/mean(tot_tsumvar))*100),dec_PM))
-        #names(icc_S2var)[i]<-paste("Sampling variance",responses[i])
       } else  {
         colnames(t_icc)<-randomvar_names[seq(from=i,to=i+length(responses)*length(model$Random$nfl),by=length(responses))]
         icc_all<-cbind(icc_all,t_icc)
-        icc_S2var<-c(icc_S2var,round(((S2var[i]/mean(tot_tsumvar))*100),dec_PM))
-        names(icc_S2var)[i]<-paste("Sampling variance",responses[i])
       }             
     } 
+    
     icc_all<-as.mcmc(icc_all[,-1])
     
   } else {
-#Single response models   
+    #Single response models   
     tvar<-var_terms
     colnames(tvar)<-variances
     tsumvar<-rowSums(tvar) #calculate sum of variances
@@ -335,11 +334,18 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),S2var=0,star
     }
     icc_all<-t_icc
     colnames(icc_all)<-randomvar_names#Need to rename colnames to match randomvar_names
-    icc_S2var<-c(icc_S2var,round(((S2var[1]/mean(tot_tsumvar))*100),dec_PM))
-    names(icc_S2var)[1]<-paste("Sampling variance",responses[1])
   }             
-
+  
   icc_all<-icc_all[,colnames(var_terms)]#Reorder to match variances
+  
+  #If there is sampling variance then add ICC calculations
+  if(sum(S2var) ==0) {
+    icc_S2var<-NULL
+  } else  {
+    icc_S2var<-numeric()
+    icc_S2var<-c(icc_S2var,round(((S2var[i]/mean(tot_tsumvar))*100),dec_PM))
+    names(icc_S2var)[i]<-paste("Sampling variance",responses[i])
+  }  
   
   #Summaries
   icc1=paste(round(colMeans(icc_all),dec_PM)," (",round(HPDinterval(icc_all)[,1],dec_PM), ", ",round(HPDinterval(icc_all)[,2],dec_PM),")",sep="")

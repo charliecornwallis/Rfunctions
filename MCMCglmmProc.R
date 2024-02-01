@@ -438,8 +438,10 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
     if(is.null(covariances)) {
       covariances<-colnames(model$VCV)[colnames(model$VCV) != variances]
     } else  {
-      covariances <- sub(ginv, "animal", covariances)
+      covariances<-covariances
     }
+    #rename phylogeny term to animal
+    covariances<-sub(ginv, "animal", covariances)
     covar_terms<-as.mcmc(as.matrix((model$VCV[,covariances])))
     colnames(covar_terms)<-randomcovar_names
     

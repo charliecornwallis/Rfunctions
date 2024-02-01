@@ -73,10 +73,12 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #Remove mev from random effect
   model$VCV<-model$VCV[, colnames(model$VCV) !="sqrt(mev):sqrt(mev).meta"]
   
-  #rename phylogeny or pedigree term (ginv=) to animal
+  #Rename phylogeny or pedigree term (ginv=) to animal
   colnames(model$VCV) <- sub(ginv, "animal", colnames(model$VCV))
+  variances <- sub(ginv, "animal", variances)
+  covariances <- sub(ginv, "animal", covariances)
   
-  #rename model fixed effects
+  #Rename model fixed effects
   if(is.null(fixed_names)) {
     colnames(model$Sol)<- colnames(model$Sol)
   } else  {colnames(model$Sol)<-fixed_names

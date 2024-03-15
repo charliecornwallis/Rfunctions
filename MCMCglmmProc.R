@@ -496,7 +496,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
     corr_select = corr_comp %>% dplyr::filter(Fixed_Effects %in% cor_diffs == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC) %>% dplyr::rename("Correlation comparions"="Fixed_Effects")
     
     ##Write data to excel sheet
-    writeData(workbook, sheet, corr_select, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+ifelse(dim(corr_select)[1] > 0,dim(randomCorr)[1]+1,0)+padding,headerStyle = hs2)
+    writeData(workbook, sheet, corr_select, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+ifelse(dim(corr_select)[1] > 0,dim(randomCorr)[1]+1,0),headerStyle = hs2)
     conditionalFormatting(workbook, sheet, cols=3, rows=start_row+dim(header)[1]+dim(fixed)[1]+dim(randomVar)[1]+4:10000, rule="<0.05", style = bolding)
   }
   

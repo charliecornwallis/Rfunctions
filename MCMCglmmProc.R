@@ -12,6 +12,7 @@
 # covariances =c("traitZavestanCarb:traitob_host.animal","traitZavestanProtein:traitob_host.animal","traitZavestanFat:traitob_host.animal","traitZavestanEssAA:traitob_host.animal","traitZavestanNonessAA:traitob_host.animal","traitZavestanA:traitob_host.animal","traitZavestanB:traitob_host.animal","traitZavestanE:traitob_host.animal","traitZavestanCarb:traitob_host.units","traitZavestanProtein:traitob_host.units","traitZavestanFat:traitob_host.units","traitZavestanEssAA:traitob_host.units","traitZavestanNonessAA:traitob_host.units","traitZavestanA:traitob_host.units","traitZavestanB:traitob_host.units","traitZavestanE:traitob_host.units")
 # randomvar_names=c("Phylogeny Obligate","Phylogeny Carbs","Phylogeny Protein","Phylogeny Fat","Phylogeny EssAA","Phylogeny NonEssAA","Phylogeny Vit A", "Phylogeny Vit B","Phylogeny Vit E","Residual Obligate","Residual Carbs","Residual Protein","Residual Fat","Residual EssAA","Residual NonEssAA","Residual Vit A","Residual Vit B","Residual Vit E")
 # randomcovar_names =c("Phylogeny Carbs : Phylogeny Obligate","Phylogeny Protein : Phylogeny Obligate"," Phylogeny Fat : Phylogeny Obligate","Phylogeny EssAA : Phylogeny Obligate","Phylogeny NonEssAA : Phylogeny Obligate","Phylogeny Vit A : Phylogeny Obligate","Phylogeny Vit B : Phylogeny Obligate","Phylogeny Vit E : Phylogeny Obligate","Residual Carbs : Residual Obligate","Residual Protein : Residual Obligate"," Residual Fat : Residual Obligate","Residual EssAA : Residual Obligate","Residual NonEssAA : Residual Obligate","Residual Vit A : Residual Obligate","Residual Vit B : Residual Obligate","Residual Vit E : Residual Obligate")
+# cor_diffs = c("Noncoop Phylogeny temp within-year : Noncoop Phylogeny temp vs Pair Phylogeny temp within-year : Pair Phylogeny temp","Noncoop Phylogeny temp between-year : Noncoop Phylogeny temp vs Pair Phylogeny temp between-year : Pair Phylogeny temp")
 # padding=3
 # fixed_del="none"
 # fixed_grp=NULL
@@ -23,13 +24,13 @@
 # dec_PM=2
 # pvalues="exclude"
 # S2var=0
-# levels=0
+# cor_diff=NULL
 
 #Function ----
 
-MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",levels=0)
+MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",cor_diff=NULL)
 { 
-  #Explanation of terms
+  #Explanation of terms ----
   #model = MCMCglmm model
   #response = list of responses (e.g. c(trait1,trait2))
   #link = link functions used for each response variable (e.g. c("logit","gaussian")). Changes the calculation of ICCs by adding distribution variances.
@@ -56,7 +57,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #For Multi-response models can provide a list of link functions (e.g. c("gaussian","logit")) corresponding to each response trait
   #responses = specify response variables can take multiple values for multi response
   #pvalues = exclusion of pMCMC values for fixed effects - "exclude", "include" or "c(?,?...)" giving list of which p values to exclude. Note pMCMC will still be calculated for fixed effect comparisons
-  #levels = if at.level notation is used how many levels are there. Default is 0.
+  #cor_diff = calculates differences between correlations. Should be specified in the same way as fixed_diffs e.g. c("cor1 vs cor2","cor1 vs cor3"...) 
   
   #Naming aid ----
   #variances=c("trait1:trait1.animal","trait2:trait2.animal","trait3:trait3.animal","trait4:trait4.animal","trait5:trait5.animal","trait6:trait6.animal","trait7:trait7.animal","trait8:trait8.animal","trait9:trait9.animal","trait1:trait1.units","trait2:trait2.units","trait3:trait3.units","trait4:trait4.units","trait5:trait5.units","trait6:trait6.units","trait7:trait7.units","trait8:trait8.units","trait9:trait9.units"),
@@ -64,7 +65,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #randomvar_names=c("Phylogeny Trait1","Phylogeny Trait2","Phylogeny Trait3","Phylogeny Trait4","Phylogeny Trait5","Phylogeny Trait6","Phylogeny Trait7", "Phylogeny Trait8","Phylogeny Trait9","Residual Trait1","Residual Trait2","Residual Trait3","Residual Trait4","Residual Trait5","Residual Trait6","Residual Trait7","Residual Trait8","Residual Trait9"),
   #randomcovar_names =c("Phylogeny Trait2 : Phylogeny Trait1","Phylogeny Trait3 : Phylogeny Trait1","Phylogeny Trait4 : Phylogeny Trait1","Phylogeny Trait5 : Phylogeny Trait1","Phylogeny Trait6 : Phylogeny Trait1","Phylogeny Trait7 : Phylogeny Trait1","Phylogeny Trait8 : Phylogeny Trait1","Phylogeny Trait9 : Phylogeny Trait1","Residual Trait2 : Residual Trait1","Residual Trait3 : Residual Trait1","Residual Trait4 : Residual Trait1","Residual Trait5 : Residual Trait1","Residual Trait6 : Residual Trait1","Residual Trait7 : Residual Trait1","Residual Trait8 : Residual Trait1","Residual Trait9 : Residual Trait1"),
   
-  #Load packages
+  #Load packages and naming ----
   pacman::p_load(MCMCglmm,coda,openxlsx,stringdist)
   
   #Remove unwanted effects
@@ -83,7 +84,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   }
   
   #****************************************************
-  #Fixed effects and Differences between levels
+  #Fixed effects and Differences between levels ----
   #****************************************************
   #Main effects
   nF=model$Fixed$nfl
@@ -106,7 +107,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   
   fe1=data.frame(Fixed_Effects=colnames(model$Sol),Estimates=fe1, pMCMC=fe1_p)
   
-  #Do any fixed effects need to be deleted
+  ##fixed_del ----
   if(any(fixed_del == "none")) {
     fe1=fe1
   } else  {
@@ -140,7 +141,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #Differences between fixed effects
   fe2<-pairwise.diffs(model$Sol,nF=model$Fixed$nfl)
   
-  #Estimate differences between specified groups of fixed effects
+  ##fixed_grp ----
   if(is.null(fixed_grp)) {
     fixed=rbind(fe1,fe2)
   } else  {
@@ -155,14 +156,14 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
     fixed=rbind(fe1,fe2)
   }
   
-  #Do any comparisons need to be deleted
+  ##fixed_diffdel ----
   if(any(fixed_diffdel == "none")) {
     fixed=fixed
   } else  {
     fixed = fixed %>% dplyr::filter(Fixed_Effects %in% fixed_diffdel == F) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC)
   }
   
-  #Should only specific effects be included
+  ##fixed_diffinc ----
   if(any(fixed_diffinc == "all")) {
     fixed=fixed
   } else  {
@@ -176,7 +177,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
     fixed = fixed
   }
   
-  #Should any differences of differences be calculated
+  ##fixed_diff_diffs ----
   if(is.null(fixed_diff_diffs)) {
     fixed=fixed
   } else  {
@@ -235,7 +236,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   }
   
   #****************************************************
-  #Random effects
+  #Random effects ----
   #****************************************************
   #if variances are not specified make them the same as those in the model
   if(is.null(variances)) {
@@ -251,7 +252,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   } else  {variances<-variances
   }
   
-  #Separate out variance and covariance terms
+  ##Separate out variance and covariance terms ----
   var_terms<-model$VCV[,variances]
   
   #rename random effects if specified
@@ -262,7 +263,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   }
   
   #****************************************************
-  #Variance output
+  ##Variance output ----
   #Summary of variance components
   rand1=paste(round(posterior.mode(var_terms),dec_PM)," (",round(HPDinterval(var_terms)[,1],dec_PM), ", ",round(HPDinterval(var_terms)[,2],dec_PM),")",sep="")
   
@@ -303,9 +304,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
         t_icc[,!grepl("animal",colnames(t_icc))]<-(t_icc[,!grepl("animal",colnames(t_icc))]/(tot_tsumvar))*100
       }
       
-      #Need to rename colnames to match randomvar_names & need to account for models with at.level notation
-      if(levels>0) {
-        number_random=length(model$Random$nfl)+levels #+levels to add residual variance
+      #Need to rename colnames to match randomvar_names & need to account for models with more than 1 residual variance notation
+      if(length(model$Residual$nfl)>0) {
+        number_random=length(model$Random$nfl)+length(model$Residual$nfl) #add residual variance
         colnames(t_icc)<-randomvar_names[seq(from=i,to=number_random*length(responses),by=length(responses))]
         icc_all<-cbind(icc_all,t_icc)
       } else  {
@@ -350,7 +351,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #Summaries
   icc1=paste(round(colMeans(icc_all),dec_PM)," (",round(HPDinterval(icc_all)[,1],dec_PM), ", ",round(HPDinterval(icc_all)[,2],dec_PM),")",sep="")
   
-  #Output to excel
+  #****************************************************
+  #Excel output: fixed and random effects ----
+  #****************************************************
   #Fixed effects
   fixedeff <- fixed[!grepl(" vs ",fixed$Fixed_Effects),]
   fixedeff<-data.frame("Fixed Effects"=fixedeff$Fixed_Effects,"Posterior Mode (CI)"=fixedeff$Estimates,"pMCMC"=fixedeff$pMCMC,check.names=FALSE)
@@ -408,8 +411,6 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
     
   }
   
-  
-  
   #Bold pMCMC values less than 0.05
   bolding<-createStyle(textDecoration="bold")
   conditionalFormatting(workbook, sheet, cols=3, rows=1:10000, rule="<0.05", style = bolding)
@@ -423,7 +424,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   }
   
   #****************************************************
-  #Random effects: correlations
+  #Correlations ----
   #****************************************************
   #Covariance output - correlations
   
@@ -478,12 +479,30 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
     }
     randomCorr<-data.frame("Correlations"=colnames(covar_terms),"Posterior Mode (CI)"=cor1,"pMCMC"=round(as.numeric(pCor),3), check.names=FALSE)
     
-    #Write data to excel sheet
+    ##Write data to excel sheet ----
     writeData(workbook, sheet, randomCorr, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+padding,headerStyle = hs2)
     conditionalFormatting(workbook, sheet, cols=3, rows=start_row+dim(header)[1]+dim(fixed)[1]+dim(randomVar)[1]+4:10000, rule="<0.05", style = bolding)
   }
   
-  #Some formatting
+  ##Cor_diffs ----
+  #If no cor_diffs then skip this part
+  if(is.null(cor_diffs)) {
+    return(workbook)
+  }
+  else  {
+    #Calculate differences between correlations
+    colnames(corrs)=colnames(covar_terms)
+    corr_comp<-pairwise.diffs(corrs,nF=length(colnames(corrs)))
+    
+    #Select specified comparisons
+    corr_select = corr_comp %>% dplyr::filter(Fixed_Effects %in% cor_diffs == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC) %>% dplyr::rename("Correlation comparions"="Fixed_Effects")
+    
+    ##Write data to excel sheet
+    writeData(workbook, sheet, corr_select, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+ifelse(dim(corr_select)[1] > 0,dim(corr_select)[1]+1,0)+padding,headerStyle = hs2)
+    conditionalFormatting(workbook, sheet, cols=3, rows=start_row+dim(header)[1]+dim(fixed)[1]+dim(randomVar)[1]+4:10000, rule="<0.05", style = bolding)
+  }
+  
+  #Some final formatting ----
   for(i in 1:length(sheets(workbook))){
     setColWidths(workbook, sheet = i, cols = 1:20, widths = "auto")
   }

@@ -58,4 +58,5 @@ MCMCglmmProc.R
 
 #pvalues = exclusion of pMCMC values for fixed effects - "exclude", "include" or "c(?,?...)" giving list of which p values to exclude. Note pMCMC will still be calculated for fixed effect comparisons
 
-#levels = if at.level notation is used how many levels are there. Default is 0.
+#cor_diffs = calculates differences between correlations. Should be specified in the same way as fixed_diffs e.g. c("cor1 vs cor2","cor1 vs cor3"...) 
+  

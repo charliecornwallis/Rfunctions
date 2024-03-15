@@ -28,7 +28,7 @@
 
 #Function ----
 
-MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",cor_diff=NULL)
+MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",cor_diffs=NULL)
 { 
   #Explanation of terms ----
   #model = MCMCglmm model
@@ -429,10 +429,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #Covariance output - correlations
   
   #If no covariances skip this part
-  if(is.null(covariances)) {
+  if(is.null(randomcovar_names)) {
     return(workbook)
-  }
-  else  {
+  } else  {
     #Covariance identification if not specified
     if(is.null(covariances)) {
       covariances<-colnames(model$VCV)[colnames(model$VCV) != variances]
@@ -480,7 +479,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
     randomCorr<-data.frame("Correlations"=colnames(covar_terms),"Posterior Mode (CI)"=cor1,"pMCMC"=round(as.numeric(pCor),3), check.names=FALSE)
     
     ##Write data to excel sheet ----
-    writeData(workbook, sheet, randomCorr, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+padding,headerStyle = hs2)
+    writeData(workbook, sheet, randomCorr, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1],headerStyle = hs2)
     conditionalFormatting(workbook, sheet, cols=3, rows=start_row+dim(header)[1]+dim(fixed)[1]+dim(randomVar)[1]+4:10000, rule="<0.05", style = bolding)
   }
   
@@ -488,8 +487,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #If no cor_diffs then skip this part
   if(is.null(cor_diffs)) {
     return(workbook)
-  }
-  else  {
+  } else  {
     #Calculate differences between correlations
     colnames(corrs)=colnames(covar_terms)
     corr_comp<-pairwise.diffs(corrs,nF=length(colnames(corrs)))
@@ -498,7 +496,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
     corr_select = corr_comp %>% dplyr::filter(Fixed_Effects %in% cor_diffs == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC) %>% dplyr::rename("Correlation comparions"="Fixed_Effects")
     
     ##Write data to excel sheet
-    writeData(workbook, sheet, corr_select, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+ifelse(dim(corr_select)[1] > 0,dim(corr_select)[1]+1,0)+padding,headerStyle = hs2)
+    writeData(workbook, sheet, corr_select, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+ifelse(dim(corr_select)[1] > 0,dim(randomCorr)[1]+1,0)+padding,headerStyle = hs2)
     conditionalFormatting(workbook, sheet, cols=3, rows=start_row+dim(header)[1]+dim(fixed)[1]+dim(randomVar)[1]+4:10000, rule="<0.05", style = bolding)
   }
   

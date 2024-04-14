@@ -36,7 +36,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   pacman::p_load(Hmsc,coda,stringdist,runjags,openxlsx)
   
   #Convert model object
-  model=hm1
+  model=model
   post_model = convertToCodaObject(model)
   
   #****************************************************

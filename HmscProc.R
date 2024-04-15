@@ -1,30 +1,6 @@
 #***************************************
 #Function for processing Hmsc models#
 #***************************************
-#troubleshooting
-model=hm3 # model object
-start_row=NULL #start row of excel sheet for species averages
-workbook=NULL #name of workbook to add results to if already exists
-create_sheet="yes" #create a new sheet for species average values
-sheet="sheet1" #what to name sheet
-title="" #title of tables
-fixed_names=NULL #names of fixed effects
-fixed_diffinc="none" #the differences between fixed effects for species averages to include e.g. fixed_diffinc=c("A vs B")
-fixed_diff_diffs =NULL #compare differences of differences between fixed effects of species averages e.g. fixed_diff_diffs=c("A vs B - C vs D")
-#fixed_diffinc_species=c("TreatmentControl: otu_005 vs TreatmentFaecal: otu_005") #differences between fixed effects to include for specific species e.g. fixed_diffinc_species=c(c("A: species1 vs B: species 1"))
-pvalues = "include" #include pvalues for comparisons or not
-VP_ave = "include" #include variance partitioning for species averages
-Include_species ="include" #should a separate sheet with species estimates be included?
-VP_species = "include" #include variance partitioning for all species
-fixed_diffinc_species="none" #the differences between fixed effects for species averages to include for specific species
-randomvar_names=NULL #random variables names
-Include_random = "yes" #include random effect estimates or not
-random_names_species = NULL #rename random effects for each species, if NULL then takes models names
-Include_random_species = "yes" #include random effect variances for each species
-padding=4 #spacing in excel file
-dec_PM=2 #decimal places of estimates
-
-#Function ----
 
 HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",pvalues = "include",VP_ave = "include",randomvar_names=NULL,Include_random = "yes",Include_species ="include", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",padding=4,dec_PM=2)
 { 

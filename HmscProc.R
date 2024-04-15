@@ -1,52 +1,101 @@
 #***************************************
 #Function for processing Hmsc models#
 #***************************************
+#troubleshooting
+model=hm3 # model object
+start_row=NULL #start row of excel sheet for species averages
+workbook=NULL #name of workbook to add results to if already exists
+create_sheet="yes" #create a new sheet for species average values
+sheet="sheet1" #what to name sheet
+title="" #title of tables
+fixed_names=NULL #names of fixed effects
+fixed_diffinc="none" #the differences between fixed effects for species averages to include e.g. fixed_diffinc=c("A vs B")
+fixed_diff_diffs =NULL #compare differences of differences between fixed effects of species averages e.g. fixed_diff_diffs=c("A vs B - C vs D")
+#fixed_diffinc_species=c("TreatmentControl: otu_005 vs TreatmentFaecal: otu_005") #differences between fixed effects to include for specific species e.g. fixed_diffinc_species=c(c("A: species1 vs B: species 1"))
+pvalues = "include" #include pvalues for comparisons or not
+VP_ave = "include" #include variance partitioning for species averages
+Include_species ="include" #should a separate sheet with species estimates be included?
+VP_species = "include" #include variance partitioning for all species
+fixed_diffinc_species="none" #the differences between fixed effects for species averages to include for specific species
+randomvar_names=NULL #random variables names
+Include_random = "yes" #include random effect estimates or not
+random_names_species = NULL #rename random effects for each species, if NULL then takes models names
+Include_random_species = "yes" #include random effect variances for each species
+padding=4 #spacing in excel file
+dec_PM=2 #decimal places of estimates
 
 #Function ----
 
-HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="all",fixed_diff_diffs =NULL,pvalues = "include",VP_species = "include",randomvar_names=NULL,Include_random = "yes",padding=4,dec_PM=2)
+HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",pvalues = "include",VP_ave = "include",randomvar_names=NULL,Include_random = "yes",Include_species ="include", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",padding=4,dec_PM=2)
 { 
   #Explanation ----
-  #1. Takes an Hmsc model and combines estimates from multiple chains
+  #1. Takes an Hmsc model and combines estimates from multiple chains and output 2 excel sheets: 1) averages across species; 2) Per species values. If there are multiple species these are averaged per mcmc sample using rowMeans to produce posterior distribution of average effects.
   #2. Estimates posterior modes and HPDintervals for effects
   #3. Calculates specified differences for fixed effects
-  #4. Calculates % variation explained by random effects [not yet implemented]
-  #5. Calculates % variation explained per species
-  #6. Calculates fit statistics
-  #7. Output results to data.frame
+  #4. Calculates average variance explained by random effects
+  #5. Calculates % variation of explained by fixed and random effects 
+  #6. For models with phylogenetic effects it outputs Rho
+  #7. Calculates fit statistics
+  #8. Output results to excel file
   
-  #Troubleshooting aid
-  # model=model
-  # workbook=NULL
-  # start_row=1
-  # create_sheet="yes"
-  # sheet="Hm_1"
-  # title="Table for X"
-  # fixed_names=c()
-  # fixed_diffinc=c()
-  # pvalues = "include"
-  # VP_species = "include"
-  # randomvar_names=c()
-  # fixed_diff_diffs =NULL
-  # Include_random = "yes"
-  # padding=4
-  # dec_PM=2
+  #Example Terms
+  # model=hm1, # model object
+  # start_row=NULL, #start row of excel sheet for species averages
+  # workbook=NULL, #name of workbook to add results to if already exists
+  # create_sheet="yes", #create a new sheet for species average values
+  # sheet="Table 1", #what to name sheet
+  # title="Table 1", #title of tables
+  # fixed_names=c("A","B","C","D"), #names of fixed effects
+  # fixed_diffinc=c("A vs B"), #the differences between fixed effects for species averages to include e.g. fixed_diffinc=c("A vs B")
+  # fixed_diff_diffs =NULL, #compare differences of differences between fixed effects of species averages e.g. fixed_diff_diffs=c("A vs B - C vs D")
+  # pvalues = "include", #include pvalues for comparisons or not
+  # randomvar_names=c("Group","Fam","Week"),#names of random effects - will take from model object if not specified
+  # VP_ave = "include", #include variance partitioning for species averages
+  # Include_random = "yes", #include random effect estimates or not
+  # Include_species ="include", #should a separate sheet with species estimates be included?
+  # fixed_diffinc_species="none", #differences between fixed effects to include for specific species e.g. fixed_diffinc_species=c(c("A: species1 vs B: species 1"))
+  # VP_species = "include", #include variance partitioning for all species
+  # randomvar_names=NULL, #random variables names
+  # random_names_species = NULL, #names for ranodm effects for each species
+  # Include_random_species = "yes", #include random effect variances for each species
+  # padding=4, #spacing in excel file
+  # dec_PM=2) #decimal places of estimates
   
-  #Load packages and naming ----
-  pacman::p_load(Hmsc,coda,stringdist,runjags,openxlsx)
+  #****************************************************
+  #Section 1: averages per species ----
+  #****************************************************
+  
+  #Load packages and naming
+  pacman::p_load(Hmsc,coda,stringdist,runjags,matrixStats,openxlsx)
   
   #Convert model object
-  model=model
   post_model = convertToCodaObject(model)
   
   #****************************************************
   #Fixed effects ----
   #****************************************************
-  fixed_mod = combine.mcmc(post_model$Beta)
+  tmp1 = combine.mcmc(post_model$Beta)
+  
+  #If multiple species average across
+  fixed_mod<-matrix(nrow = nrow(tmp1),ncol = (ncol(tmp1)/model$ns))
+  
+  #extract estimates and average estimates
+  if(model$ns >1) {
+  for(i in 1:model$nc){
+    tmp2<-tmp1[,c(seq(from = i, to = model$ns*model$nc, by = model$nc))]
+    fixed_mod[,i]<-rowMeans(tmp2)
+  } 
+  }   else  {
+    fixed_mod = tmp1
+  }
+  
+  fixed_mod = as.mcmc(fixed_mod)
   
   #Rename model fixed effects
   if(is.null(fixed_names)) {
-    colnames(fixed_mod)<- colnames(fixed_mod)
+    colnames(fixed_mod)<- colnames(tmp1)[1:model$nc]
+    colnames(fixed_mod) <- sub("\\(.*", "", colnames(fixed_mod))
+    colnames(fixed_mod) <- sub("^B\\[", "", colnames(fixed_mod))
   } else  {colnames(fixed_mod)<-fixed_names
   }
   
@@ -98,11 +147,12 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   
   #All differences between fixed effects
   fe2<-pairwise.diffs(fixed_mod,nF=nF)
-  fixed=rbind(fe1,fe2)
   
   ##fixed_diffinc ----
-  if(any(fixed_diffinc == "all")) {
+  if(any(fixed_diffinc == "none")) {
+    fixed=fe1
   } else  {
+    fixed=rbind(fe1,fe2)
     fixed = fixed %>% dplyr::filter(Fixed_Effects %in% c(fixed_names,fixed_diffinc) == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC)
   }
   
@@ -169,16 +219,27 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #****************************************************
   #Random effects ----
   #****************************************************
-  if(length(post_model$Omega)>1) {
+  #matrix for placing estimates into
+  random_mod = matrix(nrow = model$samples*length(model$repList), ncol =length(post_model$Omega))
+  
+  for(i in 1:length(post_model$Omega)){
+    #combine chains 
+    tmp1 = combine.mcmc(post_model$Omega[i])
+    tmp2= matrix(nrow = dim(tmp1)[1], ncol =model$ns)
     
-    #Create matrix to put estimates in
-    random_mod = matrix(NA,length(post_model$Omega[[1]][[1]])*length(model$repList),length(post_model$Omega))
-    
-    #extract estimates
-    for(i in 1:length(post_model$Omega)){
-      random_mod[,i]<-combine.mcmc(post_model$Omega[i])
-      random_mod<-as.mcmc(random_mod)
+    #extract variances for each species for each random effect
+    for(j in 1:dim(tmp1)[1]){
+    tmp3 = matrix(tmp1[j,],nrow = model$ns, ncol =model$ns)
+    tmp3 = diag(tmp3)
+    tmp2[j,] = tmp3 
     }
+    
+    #Average across species
+    tmp2 = rowMeans(tmp2)
+    random_mod[,i] = tmp2
+  }
+  
+    random_mod<-as.mcmc(random_mod)
     
     #Name columns
     #if variances are not specified make them the same as those in the model
@@ -187,28 +248,44 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     } else  {colnames(random_mod)<-randomvar_names
     }
     
+    if(Include_random == "yes") {
     #Summary of variance components
     rand1 = paste(round(posterior.mode(random_mod),dec_PM)," (",round(HPDinterval(random_mod)[,1],dec_PM), ", ",round(HPDinterval(random_mod)[,2],dec_PM),")",sep="")
     rand1 = data.frame("Random Effects"=colnames(random_mod),"Posterior Mode (CI)"=rand1,"-"="",check.names=FALSE)
   } else  {
   }
   
-  #% variation per species ----
-  if(VP_species == "include") {
-    VP = data.frame(computeVariancePartitioning(model)$vals)
+  #****************************************************
+  #% variation of explained by fixed and random effects averaged across species  ----
+  #****************************************************
+  if(VP_ave == "include") {
+    VP = computeVariancePartitioning(model)$vals
+    VP = data.frame(rowMeans(VP))
     VP = VP %>% mutate(across(everything(), ~round(., 2)))
-    VP = data.frame("Variance Partitioning"=rownames(VP),VP,check.names=FALSE)
+    VP = data.frame("Variance Partitioning"=rownames(VP),"%"=VP[,1],check.names=FALSE)
     rownames(VP)<-NULL
   } else  {
   }
   
+  #****************************************************
   #Fit statistics ----
+  #****************************************************
   # To assess model fit in terms of $R^2$, we apply the `evaluateModelFit` function to the posterior predictive distribution computed by the function `computePredictedValues`.
   model_preds = computePredictedValues(model)
   model_fit = as.data.frame(evaluateModelFit(model, predY=model_preds))
   
   #Round fit stats
-  model_fit = model_fit %>% mutate(across(everything(), ~round(., 2)))
+  model_fit = model_fit %>% mutate(across(everything(), ~round(., 2))) %>% dplyr::summarise(across(everything(), ~mean(., na.rm=T)))
+  
+  #****************************************************
+  #Phylo effects ----
+  #****************************************************
+  if(is.null(post_model$Rho)) {
+  } else  {
+    rho = as.mcmc(unlist(post_model$Rho))
+    rho = paste(round(posterior.mode(rho),dec_PM)," (",round(HPDinterval(rho)[,1],dec_PM), ", ",round(HPDinterval(rho)[,2],dec_PM),")",sep="")
+    rho = data.frame("Phylogenetic Effects"="Rho", "Posterior Mode (CI)"=rho,check.names=FALSE)
+  }
   
   #****************************************************
   #Excel output: fixed and random effects ----
@@ -235,7 +312,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   
   #Calculate start row
   if(is.null(start_row)) {
-    start_row=dim(readWorkbook(workbook,sheet =sheet,skipEmptyRows = F))[1]+padding
+    start_row=padding
   } else  {start_row=start_row
   }
   
@@ -256,7 +333,6 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
   }
   
-  
   #Bold pMCMC values less than 0.05
   bolding<-createStyle(textDecoration="bold")
   conditionalFormatting(workbook, sheet, cols=3, rows=1:10000, rule="<0.05", style = bolding)
@@ -269,16 +345,206 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     workbook=workbook
   }
   
-  if(VP_species == "include") {
+  if(VP_ave == "include") {
     writeData(workbook, sheet, VP, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2,headerStyle = hs2)
   } else  {
     workbook=workbook
   }
   
-  writeData(workbook, sheet, "Fit statistics", startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+2,headerStyle = hs2)
-  writeData(workbook, sheet, model_fit, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+3,headerStyle = hs2)
+  if(is.null(post_model$Rho)) {
+    workbook=workbook  
+  } else  {
+    writeData(workbook, sheet, rho, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+3,headerStyle = hs2)
+      }
   
+  writeData(workbook, sheet, "Fit statistics", startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+5,headerStyle = hs2)
+  writeData(workbook, sheet, model_fit, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+7,headerStyle = hs2)
+  
+  #****************************************************
+  #Section 2: per species values ----
+  #****************************************************
+  #should species estimates be included then proceed, otherwise return workbook
+  if(Include_species == "include") {
+    
+  #****************************************************
+  #Fixed effects ----
+  #****************************************************
+  fixed_mod = combine.mcmc(post_model$Beta)
+
+  #Rename model fixed effects
+  if(is.null(fixed_names)) {
+    
+    fixed_names = character()
+    for(i in 1:length(model$spNames)){
+      tmp = paste(model$covNames,model$spNames[i],sep=": ")
+      fixed_names = c(fixed_names,tmp)
+    }
+    colnames(fixed_mod)<-fixed_names
+  } else  {
+    tmp = character()
+    for(i in 1:length(model$spNames)){
+      tmp2 = paste(fixed_names,model$spNames[i],sep=": ")
+      tmp = c(tmp,tmp2)
+    }
+    colnames(fixed_mod)<-tmp
+  }
+  
+  #P values using summary.MCMCglmm code
+  nF=dim(fixed_mod)[2]
+  #Pvalues = option to exclude 
+  if(pvalues == "include") {
+    fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
+    fe1_p=round(as.numeric(fe1_p),3)
+  } else  {
+    if(pvalues == "exclude") {
+      fe1_p=rep("-",length(fixed_names))
+    } else  {
+      fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
+      fe1_p=round(as.numeric(fe1_p),3)
+      fe1_p[pvalues]<-"-"
+    }
+  }
+  
+  fe1=paste(round(posterior.mode(fixed_mod),dec_PM)," (",round(HPDinterval(fixed_mod)[,1],dec_PM), ", ",round(HPDinterval(fixed_mod)[,2],dec_PM),")",sep="")
+  fe1=data.frame(Fixed_Effects=colnames(fixed_mod),Estimates=fe1, pMCMC=fe1_p)
+  
+  #****************************************************
+  ##Differences between fixed effects ----
+  #****************************************************
+  #All differences between fixed effects
+  fe2<-pairwise.diffs(fixed_mod,nF=nF)
+  
+  ##fixed_diffinc ----
+  if(any(fixed_diffinc_species == "none")) {
+    fixed=fe1
+  } else  {
+    fixed=rbind(fe1,fe2)
+    fixed = fixed %>% dplyr::filter(Fixed_Effects %in% c(fixed_names,fixed_diffinc_species) == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC)
+  }
+  
+  #****************************************************
+  #Random effects ----
+  #****************************************************
+  #matrix for placing estimates into
+  random_mod = matrix(nrow = model$samples*length(model$repList))
+  
+  for(i in 1:length(post_model$Omega)){
+    #combine chains 
+    tmp1 = combine.mcmc(post_model$Omega[1])
+    tmp2= matrix(nrow = dim(tmp1)[1], ncol =model$ns)
+    
+    #extract variances for each species for each random effect
+    for(j in 1:dim(tmp1)[1]){
+      tmp3 = matrix(tmp1[j,],nrow = model$ns, ncol =model$ns)
+      tmp3 = diag(tmp3)
+      tmp2[j,] = tmp3 
+    }
+    
+    random_mod = cbind(random_mod,tmp2)
+  }
+  random_mod = random_mod[,-1]
+  random_mod<-as.mcmc(random_mod)
+  
+  #Rename model random effects
+  if(is.null(random_names_species)) {
+    
+    random_names_species = character()
+    for(i in 1:length(model$rLNames)){
+      tmp = paste(model$rLNames[i],model$spNames,sep=": ")
+      random_names_species = c(random_names_species,tmp)
+    }
+    colnames(random_mod)<-random_names_species
+  } else  {
+    colnames(random_mod)<-random_names_species
+  }
+
+  
+  if(Include_random_species == "yes") {
+    #Summary of variance components
+    rand1 = paste(round(posterior.mode(random_mod),dec_PM)," (",round(HPDinterval(random_mod)[,1],dec_PM), ", ",round(HPDinterval(random_mod)[,2],dec_PM),")",sep="")
+    rand1 = data.frame("Random Effects"=colnames(random_mod),"Posterior Mode (CI)"=rand1,"-"="",check.names=FALSE)
+  } else  {
+  }
+  
+  #****************************************************
+  #% variation of explained by fixed and random effects for each species  ----
+  #****************************************************
+  if(VP_species == "include") {
+    VP = as.data.frame(computeVariancePartitioning(model)$vals)
+    VP = VP %>% mutate(across(everything(), ~round(., 2)))
+    VP = data.frame("Variance Partitioning"=rownames(VP),"%"=VP,check.names=FALSE)
+    rownames(VP)<-NULL
+  } else  {
+  }
+  
+  #****************************************************
+  #Fit statistics ----
+  #****************************************************
+  # To assess model fit in terms of $R^2$, we apply the `evaluateModelFit` function to the posterior predictive distribution computed by the function `computePredictedValues`.
+  model_preds = computePredictedValues(model)
+  model_fit = as.data.frame(evaluateModelFit(model, predY=model_preds))
+  
+  #Round fit stats
+  model_fit = model_fit %>% mutate(across(everything(), ~round(., 2)))
+  model_fit = data.frame(Species=model$spNames,model_fit)
+  
+  #****************************************************
+  #Excel output: fixed and random effects ----
+  #****************************************************
+  #Fixed effects
+  fixedeff <- fixed[!grepl(" vs ",fixed$Fixed_Effects),]
+  fixedeff<-data.frame("Fixed Effects"=fixedeff$Fixed_Effects,"Posterior Mode (CI)"=fixedeff$Estimates,"pMCMC"=fixedeff$pMCMC,check.names=FALSE)
+  #Fixed differences
+  fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
+  fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
+  
+  #Random
+  randomVar<-rand1
+  
+  #Create new sheet 
+  sheet2 = paste(sheet,"species",sep="_")
+  start_row = 1
+  addWorksheet(workbook, sheet2)
+
+  #table title
+  writeData(workbook, sheet2, paste(title,"species estimates",sep=" "), startCol = 1, startRow = start_row,headerStyle = hs1)
+  
+  #Fixed effects
+  writeData(workbook, sheet2, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
+  
+  #Remove column headings if deleting fixed effects as it will be assessing higher order interactions where column names are not needed
+  if(fixed_diffinc_species == "none") { #Do not write fixeddiff dataframe if fixed_diffinc_species == "none"
+  } else  {
+    writeData(workbook, sheet2, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
+  }
+  
+  #Bold pMCMC values less than 0.05
+  bolding<-createStyle(textDecoration="bold")
+  conditionalFormatting(workbook, sheet2, cols=3, rows=1:10000, rule="<0.05", style = bolding)
+  
+  #Random effects: variances
+  #Should they be outputted or not
+  if(Include_random_species == "yes") {
+    writeData(workbook, sheet2, randomVar, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0),headerStyle = hs2)
+  } else  {
+    workbook=workbook
+  }
+  
+  if(VP_species == "include") {
+    writeData(workbook, sheet2, VP, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2,headerStyle = hs2)
+  } else  {
+    workbook=workbook
+  }
+  
+  writeData(workbook, sheet2, "Fit statistics", startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+5,headerStyle = hs2)
+  writeData(workbook, sheet2, model_fit, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+7,headerStyle = hs2)
   return(workbook)
+  
+  #If species estimate != "include" then just returns a workbook with estimates averaged across species
+  } else  {
+    return(workbook)
+  }
+  
 }
 
 
@@ -300,5 +566,6 @@ hmsc_md = function(df){
     row_spec(grep("^Fixed Effect",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Random Effects",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Variance",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
+    row_spec(grep("^Phylogenetic Effects",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Fit statistics",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px")}

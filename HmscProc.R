@@ -2,38 +2,40 @@
 #Function for processing Hmsc models#
 #***************************************
 
-HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",pvalues = "include",VP_ave = "include",randomvar_names=NULL,Include_random = "yes",Include_species ="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",padding=4,dec_PM=2)
+HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",traits="include",pvalues = "include",VP_ave = "include",randomvar_names=NULL,Include_random = "yes",Include_species ="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",padding=4,dec_PM=2)
 { 
   #Explanation ----
   #1. Takes an Hmsc model and combines estimates from multiple chains and output 2 excel sheets: 1) averages across species; 2) Per species values. If there are multiple species these are averaged per mcmc sample using rowMeans to produce posterior distribution of average effects.
   #2. Estimates posterior modes and HPDintervals for effects
   #3. Calculates specified differences for fixed effects
-  #4. Calculates average variance explained by random effects
-  #5. Calculates % variation of explained by fixed and random effects 
-  #6. For models with phylogenetic effects it outputs Rho
-  #7. Calculates fit statistics
-  #8. Output results to excel file
+  #4. For models with trait data, combines runs and 
+  #5. Calculates average variance explained by random effects
+  #6. Calculates % variation of explained by fixed and random effects 
+  #7. For models with phylogenetic effects it outputs Rho
+  #8. Calculates fit statistics
+  #9. Output results to excel file
   
   #Example Terms
-  # model=hm1, # model object
-  # start_row=NULL, #start row of excel sheet for species averages
-  # workbook=NULL, #name of workbook to add results to if already exists
-  # create_sheet="yes", #create a new sheet for species average values
-  # sheet="Table 1", #what to name sheet
-  # title="Table 1", #title of tables
-  # fixed_names=c("A","B","C","D"), #names of fixed effects
-  # fixed_diffinc=c("A vs B"), #the differences between fixed effects for species averages to include e.g. fixed_diffinc=c("A vs B")
-  # fixed_diff_diffs =NULL, #compare differences of differences between fixed effects of species averages e.g. fixed_diff_diffs=c("A vs B - C vs D")
-  # pvalues = "include", #include pvalues for comparisons or not
-  # Include_random = "yes", #include random effect estimates or not
-  # randomvar_names=c("R1","R2","R3"),#names of random effects - will take from model object if not specified
-  # VP_ave = "include", #include variance partitioning for species averages
-  # Include_species ="include", #should a separate sheet with species estimates be included?
-  # fixed_diffinc_species="none", #differences between fixed effects to include for specific species e.g. fixed_diffinc_species=c(c("A: species1 vs B: species 1"))
-  # VP_species = "include", #include variance partitioning for all species
-  # Include_random_species = "yes", #include random effect variances for each species
-  # random_names_species = NULL, #names for random effects for each species
-  # padding=4, #spacing in excel file
+  # model=hm1 # model object
+  # start_row=NULL #start row of excel sheet for species averages
+  # workbook=NULL #name of workbook to add results to if already exists
+  # create_sheet="yes" #create a new sheet for species average values
+  # sheet="Table 1" #what to name sheet
+  # title="Life is good" #title of tables
+  # fixed_names=c("A","B","C","D") #names of fixed effects
+  # fixed_diffinc=c("A vs B") #the differences between fixed effects for species averages to include e.g. fixed_diffinc=c("A vs B")
+  # fixed_diff_diffs =NULL #compare differences of differences between fixed effects of species averages e.g. fixed_diff_diffs=c("A vs B - C vs D")
+  # traits="include" #include trait effects: this examines the influence of species traits on community composition (e.g. richness if presence / absence of each species)
+  # pvalues = "include" #include pvalues for comparisons or not
+  # Include_random = "yes" #include random effect estimates or not
+  # randomvar_names=c("R1","R2","R3") #names of random effects - will take from model object if not specified
+  # VP_ave = "include" #include variance partitioning for species averages
+  # Include_species ="include" #should a separate sheet with species estimates be included?
+  # fixed_diffinc_species="none" #differences between fixed effects to include for specific species e.g. fixed_diffinc_species=c(c("A: species1 vs B: species 1"))
+  # VP_species = "include" #include variance partitioning for all species
+  # Include_random_species = "yes" #include random effect variances for each species
+  # random_names_species = NULL #names for random effects for each species
+  # padding=4 #spacing in excel file
   # dec_PM=2) #decimal places of estimates
   
   #****************************************************
@@ -198,6 +200,41 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   }
   
   #****************************************************
+  #Trait effects ----
+  #****************************************************
+  #combine chains
+  gamma = combine.mcmc(post_model$Gamma)
+  
+  #name columns more clearly
+  gamma_names = character()
+  for(i in 1:length(model$trNames)){
+    tmp = paste(model$trNames[i],model$covNames,sep="_")
+    gamma_names = c(gamma_names,tmp)
+  } 
+  
+  colnames(gamma) = gamma_names
+  gamma = as.mcmc(gamma)
+  
+  #P values using summary.MCMCglmm code
+  nG=dim(gamma)[2]
+  #Pvalues = option to exclude 
+  if(pvalues == "include") {
+    ge1_p=pmax(0.5/dim(gamma)[1], pmin(colSums(gamma[,1:nG, drop = FALSE] > 0)/dim(gamma)[1], 1 - colSums(gamma[, 1:nG, drop = FALSE] > 0)/dim(gamma)[1]))*2
+    ge1_p=round(as.numeric(ge1_p),3)
+  } else  {
+    if(pvalues == "exclude") {
+      ge1_p=rep("-",length(gamma_names))
+    } else  {
+      ge1_p=pmax(0.5/dim(gamma)[1], pmin(colSums(gamma[,1:nG, drop = FALSE] > 0)/dim(gamma)[1], 1 - colSums(gamma[, 1:nG, drop = FALSE] > 0)/dim(gamma)[1]))*2
+      ge1_p=round(as.numeric(ge1_p),3)
+      ge1_p[pvalues]<-"-"
+    }
+  }
+  
+  ge1=paste(round(posterior.mode(gamma),dec_PM)," (",round(HPDinterval(gamma)[,1],dec_PM), ", ",round(HPDinterval(gamma)[,2],dec_PM),")",sep="")
+  ge1=data.frame("Trait Effects"=colnames(gamma),Estimates=ge1, pMCMC=ge1_p,check.names=FALSE)
+  
+  #****************************************************
   #Random effects ----
   #****************************************************
   #matrix for placing estimates into
@@ -261,6 +298,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #****************************************************
   #Phylo effects ----
   #****************************************************
+  #Rho = does not ask whether the species traits are correlated with the phylogeny, a question that is often in the focus of phylogenetic comparative analyses. Instead, the phylogenetic signal parameter ρ measures whether the species niches (i.e., their responses to the environmental covariates, as measured by the β parameters) show phylogenetic correlations.
   if(is.null(post_model$Rho)) {
   } else  {
     rho = as.mcmc(unlist(post_model$Rho))
@@ -307,12 +345,21 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   
   #Fixed effects
   writeData(workbook, sheet, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
-  
+  row_nums = start_row+dim(header)[1] + dim(fixedeff)[1]+1
   #Remove column headings if deleting fixed effects as it will be assessing higher order interactions where column names are not needed
-  if(any(fixed_diffinc == "none")) { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
-  } else  {
+  if(fixed_diffinc == "none") { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
+    } else  {
     writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
-  }
+    row_nums = row_nums + dim(fixeddiff)[1]+1
+    }
+  
+  #Trait effects
+  if(traits=="include") { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
+    writeData(workbook, sheet, ge1, startCol = 1, startRow = row_nums,headerStyle = hs2)
+    row_nums = row_nums + dim(ge1)[1]+1
+    } else  {
+ }
+  
   
   #Bold pMCMC values less than 0.05
   bolding<-createStyle(textDecoration="bold")
@@ -321,25 +368,26 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #Random effects: variances
   #Should they be outputted or not
   if(Include_random == "yes") {
-    writeData(workbook, sheet, randomVar, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0),headerStyle = hs2)
+    writeData(workbook, sheet, randomVar, startCol = 1, startRow = row_nums,headerStyle = hs2)
+    row_nums = row_nums + dim(randomVar)[1]+2
   } else  {
-    workbook=workbook
   }
   
   if(VP_ave == "include") {
-    writeData(workbook, sheet, VP, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2,headerStyle = hs2)
+    writeData(workbook, sheet, VP, startCol = 1, startRow = row_nums,headerStyle = hs2)
+    row_nums = row_nums + dim(VP)[1]+3
   } else  {
-    workbook=workbook
   }
   
   if(is.null(post_model$Rho)) {
     workbook=workbook  
   } else  {
-    writeData(workbook, sheet, rho, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+3,headerStyle = hs2)
-      }
+    writeData(workbook, sheet, rho, startCol = 1, startRow = row_nums,headerStyle = hs2)
+    row_nums = row_nums + dim(rho)[1]+4
+    }
   
-  writeData(workbook, sheet, "Fit statistics", startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+5,headerStyle = hs2)
-  writeData(workbook, sheet, model_fit, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+7,headerStyle = hs2)
+  writeData(workbook, sheet, "Fit statistics", startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+dim(ge1)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+5,headerStyle = hs2)
+  writeData(workbook, sheet, model_fit, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+dim(ge1)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+7,headerStyle = hs2)
   
   #****************************************************
   #Section 2: per species values ----
@@ -371,16 +419,16 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     }
     
     #P values using summary.MCMCglmm code
-    nF=dim(fixed_mod)[2]
+    nG=dim(fixed_mod)[2]
     #Pvalues = option to exclude 
     if(pvalues == "include") {
-      fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
+      fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nG, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nG, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
       fe1_p=round(as.numeric(fe1_p),3)
     } else  {
       if(pvalues == "exclude") {
         fe1_p=rep("-",length(fixed_names))
       } else  {
-        fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
+        fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nG, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nG, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
         fe1_p=round(as.numeric(fe1_p),3)
         fe1_p[pvalues]<-"-"
       }
@@ -497,12 +545,14 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
 
     #Fixed effects
     writeData(workbook, sheet2, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
+    row_nums = start_row+dim(header)[1]+dim(fixedeff)[1]+2
     
     #Remove column headings if deleting fixed effects as it will be assessing higher order interactions where column names are not needed
     if(fixed_diffinc_species == "none") { #Do not write fixeddiff dataframe if fixed_diffinc_species == "none"
-    } else  {
+      } else  {
       writeData(workbook, sheet2, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
-    }
+      row_nums = row_nums + dim(fixeddiff)[1] + 2
+        }
     
     #Bold pMCMC values less than 0.05
     bolding<-createStyle(textDecoration="bold")
@@ -511,19 +561,19 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #Random effects: variances
     #Should they be outputted or not
     if(Include_random_species == "yes") {
-      writeData(workbook, sheet2, randomVar, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0),headerStyle = hs2)
+      writeData(workbook, sheet2, randomVar, startCol = 1, startRow = row_nums,headerStyle = hs2)
+      row_nums = row_nums + dim(randomVar)[1]+2
     } else  {
-      workbook=workbook
     }
     
     if(VP_species == "include") {
-      writeData(workbook, sheet2, VP, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2,headerStyle = hs2)
-    } else  {
-      workbook=workbook
+      writeData(workbook, sheet2, VP, startCol = 1, startRow = row_nums,headerStyle = hs2)
+      row_nums = row_nums + dim(VP)[1]+2
+      } else  {
     }
     
-    writeData(workbook, sheet2, "Fit statistics", startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+5,headerStyle = hs2)
-    writeData(workbook, sheet2, model_fit, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+7,headerStyle = hs2)
+    writeData(workbook, sheet2, "Fit statistics", startCol = 1, startRow = row_nums,headerStyle = hs2)
+    writeData(workbook, sheet2, model_fit, startCol = 1, startRow = row_nums+2,headerStyle = hs2)
     return(workbook)
     
     #If species estimate != "include" then just returns a workbook with estimates averaged across species
@@ -549,6 +599,7 @@ hmsc_md = function(df){
     kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11) %>%
     row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Fixed Effect",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
+    row_spec(grep("^Trait Effects",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Random Effects",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Variance",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Phylogenetic Effects",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%

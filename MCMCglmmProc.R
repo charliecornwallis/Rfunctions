@@ -28,7 +28,7 @@
 
 #Function ----
 
-MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_del="none",fixed_grp=NULL,fixed_diffdel="none",fixed_diffinc="all",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",cor_diffs=NULL)
+MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",cor_diffs=NULL)
 { 
   #Explanation of terms ----
   #model = MCMCglmm model
@@ -41,9 +41,6 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #sheet= name of sheet "Analysis 1"
   #title = Title of table in e.g. "Table 1"
   #fixed_names = what you want fixed effects to be called e.g c("Intercept","Season length")
-  #fixed_del = any fixed effects that should deleted from output - useful if only assessing higher order interactions from a model. Also note that if this is specified then column headers will be suppressed in output table
-  #fixed_grp = vector that specifies which differences between fixed effects should be calculated. Needs to be the same length as fixed_names. If not included then all differences will be calculated. e.g. c(1,1,1,2,2,2)
-  #fixed_diffdel = specify comparisons between fixed effects that should be removed from output e.g. c("effect1 vs effect2","effect3 vs effect4"). Must exactly match names of fixed effects and be separate by " vs "
   #fixed_diffinc = same as fixed_diffdel but for specific terms to be included in output
   #fixed_diff_diffs = calculates differences between differences e.g. c("effect1 vs effect2 - effect3 vs effect4"). Must exactly match names of fixed effects and be separate by " - "
   #variances = names of variance terms in VCV object either indices or written. Must be as they appear in the model object not the renamed. If left as NULL then taken from the model object.
@@ -66,7 +63,37 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #randomcovar_names =c("Phylogeny Trait2 : Phylogeny Trait1","Phylogeny Trait3 : Phylogeny Trait1","Phylogeny Trait4 : Phylogeny Trait1","Phylogeny Trait5 : Phylogeny Trait1","Phylogeny Trait6 : Phylogeny Trait1","Phylogeny Trait7 : Phylogeny Trait1","Phylogeny Trait8 : Phylogeny Trait1","Phylogeny Trait9 : Phylogeny Trait1","Residual Trait2 : Residual Trait1","Residual Trait3 : Residual Trait1","Residual Trait4 : Residual Trait1","Residual Trait5 : Residual Trait1","Residual Trait6 : Residual Trait1","Residual Trait7 : Residual Trait1","Residual Trait8 : Residual Trait1","Residual Trait9 : Residual Trait1"),
   
   #Load packages and naming ----
-  pacman::p_load(MCMCglmm,coda,openxlsx,stringdist)
+  pacman::p_load(MCMCglmm,coda,openxlsx,stringdist,kableExtra)
+  
+  #****************************************************
+  #Check terms are specified correctly and relabel terms ----
+  #****************************************************
+  if (is.null(fixed_names) &  fixed_diffinc != "none") {
+    stop("fixed names needs to be specified for fixed_diffinc to be calculated")
+  } else {
+  }
+  
+  #If response(s) not specified
+  if (is.null(responses)) {
+    
+    convert_cbind_to_character <- function(input_string) {
+      # Extract column names
+      column_names <- gsub("cbind\\(|\\)\\(\\)", "", input_string)
+      column_names <- strsplit(column_names, ", ")[[1]]
+      
+      # Convert to a character vector
+      column_names <- trimws(column_names)
+      
+      return(column_names)
+    }
+    #multi-response models
+    responses = convert_cbind_to_character(model$Fixed$formula[2])
+    #single response models
+    responses = sub("()","",responses)
+    
+  } else {
+    responses = responses
+  }
   
   #Remove unwanted effects
   #Remove mev from random effect
@@ -76,10 +103,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   colnames(model$VCV) <- sub(ginv, "animal", colnames(model$VCV))
   variances <- sub(ginv, "animal", variances)
 
-  
   #Rename model fixed effects
   if(is.null(fixed_names)) {
-    colnames(model$Sol)<- colnames(model$Sol)
+    fixed_names<- colnames(model$Sol)
   } else  {colnames(model$Sol)<-fixed_names
   }
   
@@ -87,7 +113,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #Fixed effects and Differences between levels ----
   #****************************************************
   #Main effects
-  nF=model$Fixed$nfl
+  nF=dim(model$Sol)[2]
   fe1=paste(round(posterior.mode(model$Sol),dec_PM)," (",round(HPDinterval(model$Sol)[,1],dec_PM), ", ",round(HPDinterval(model$Sol)[,2],dec_PM),")",sep="")
   
   #P values using summary.MCMCglmm code
@@ -106,13 +132,6 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   }
   
   fe1=data.frame(Fixed_Effects=colnames(model$Sol),Estimates=fe1, pMCMC=fe1_p)
-  
-  ##fixed_del ----
-  if(any(fixed_del == "none")) {
-    fe1=fe1
-  } else  {
-    fe1 = fe1 %>% dplyr::filter(Fixed_Effects %in% fixed_del == F) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC)
-  }
   
   #function for calculating differences between all columns of a matrix
   pairwise.diffs <- function(x, nF=1)
@@ -138,44 +157,16 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   } 
   }
   
-  #Differences between fixed effects
-  fe2<-pairwise.diffs(model$Sol,nF=model$Fixed$nfl)
-  
-  ##fixed_grp ----
-  if(is.null(fixed_grp)) {
-    fixed=rbind(fe1,fe2)
-  } else  {
-    tmp_mat<-matrix(1,nrow=dim(model$Sol)[1],ncol=dim(model$Sol)[2])
-    colnames(tmp_mat)<-fixed_grp
-    combinations<-pairwise.diffs(x=tmp_mat,nF=2)
-    combinations<-combinations %>% dplyr::select(Fixed_Effects) %>% separate(Fixed_Effects,c("comb1","comb2"),sep =" vs ")
-    #dplyr::select desired combinations
-    fe2<-cbind(fe2,combinations)
-    fe2<-fe2 %>% dplyr::filter(as.numeric(comb1) == as.numeric(comb2)) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC)
-    #Combine main effects and differences
-    fixed=rbind(fe1,fe2)
-  }
-  
-  ##fixed_diffdel ----
-  if(any(fixed_diffdel == "none")) {
-    fixed=fixed
-  } else  {
-    fixed = fixed %>% dplyr::filter(Fixed_Effects %in% fixed_diffdel == F) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC)
-  }
-  
   ##fixed_diffinc ----
-  if(any(fixed_diffinc == "all")) {
-    fixed=fixed
+  if(fixed_diffinc == "none") {
+    fixed=fe1
   } else  {
+    #Differences between fixed effects
+    fe2<-pairwise.diffs(model$Sol,nF=nF)
+    fixed=rbind(fe1,fe2)
     fixed = fixed %>% dplyr::filter(Fixed_Effects %in% c(fixed_names,fixed_diffinc) == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC)
   }
   
-  #Should all comparison be deleted
-  if(any(fixed_diffdel == "all")) {
-    fixed=fe1
-  } else  {
-    fixed = fixed
-  }
   
   ##fixed_diff_diffs ----
   if(is.null(fixed_diff_diffs)) {
@@ -379,7 +370,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   }
   #Calculate start row
   if(is.null(start_row)) {
-    start_row=dim(readWorkbook(workbook,sheet =sheet,skipEmptyRows = F))[1]+padding
+    start_row=1
   } else  {start_row=start_row
   }
   

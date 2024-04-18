@@ -383,23 +383,14 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   writeData(workbook, sheet, header, startCol = 1, startRow = start_row,headerStyle = hs1)
   
   #Fixed effects
-  #Remove column headings if deleting fixed effects as it will be assessing higher order interactions where column names are not needed
-  if(any(fixed_del == "none")) {
-    writeData(workbook, sheet, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
-    
-    if(any(fixed_diffinc == "none")) { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
-    } else  {
-      writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
-    }
-    
+  #Fixed effects
+  writeData(workbook, sheet, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
+  row_nums = start_row+dim(header)[1] + dim(fixedeff)[1]+1
+  
+  if(fixed_diffinc == "none") { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
   } else  {
-    writeData(workbook, sheet, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2,colNames =FALSE)
-    
-    if(any(fixed_diffinc == "none")) { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
-    } else  {
-      writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1,headerStyle = hs2,colNames =FALSE)
-    }
-    
+    writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
+    row_nums = row_nums + dim(fixeddiff)[1]+1
   }
   
   #Bold pMCMC values less than 0.05
@@ -409,11 +400,11 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #Random effects: variances
   #Should they be outputted or not
   if(Include_random == "yes") {
-    writeData(workbook, sheet, randomVar, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0),headerStyle = hs2)
+    writeData(workbook, sheet, randomVar, startCol = 1, startRow = row_nums,headerStyle = hs2)
+    row_nums = row_nums + dim(randomVar)[1]+2
   } else  {
-    workbook=workbook
   }
-  
+
   #****************************************************
   #Correlations ----
   #****************************************************
@@ -470,8 +461,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
     randomCorr<-data.frame("Correlations"=colnames(covar_terms),"Posterior Mode (CI)"=cor1,"pMCMC"=round(as.numeric(pCor),3), check.names=FALSE)
     
     ##Write data to excel sheet ----
-    writeData(workbook, sheet, randomCorr, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1],headerStyle = hs2)
-    conditionalFormatting(workbook, sheet, cols=3, rows=start_row+dim(header)[1]+dim(fixed)[1]+dim(randomVar)[1]+4:10000, rule="<0.05", style = bolding)
+    writeData(workbook, sheet, randomCorr, startCol = 1, startRow = row_nums,headerStyle = hs2)
+    conditionalFormatting(workbook, sheet, cols=3, rows=row_nums+4:10000, rule="<0.05", style = bolding)
+    row_nums = row_nums + dim(randomCorr)[1]+2
   }
   
   ##Cor_diffs ----
@@ -487,8 +479,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
     corr_select = corr_comp %>% dplyr::filter(Fixed_Effects %in% cor_diffs == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC) %>% dplyr::rename("Correlation comparions"="Fixed_Effects")
     
     ##Write data to excel sheet
-    writeData(workbook, sheet, corr_select, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+ifelse(dim(corr_select)[1] > 0,dim(randomCorr)[1]+1,0),headerStyle = hs2)
-    conditionalFormatting(workbook, sheet, cols=3, rows=start_row+dim(header)[1]+dim(fixed)[1]+dim(randomVar)[1]+4:10000, rule="<0.05", style = bolding)
+    writeData(workbook, sheet, corr_select, startCol = 1, startRow = row_nums,headerStyle = hs2)
+    conditionalFormatting(workbook, sheet, cols=3, rows=row_nums+4:10000, rule="<0.05", style = bolding)
+    row_nums = row_nums + dim(corr_select)[1]+2
   }
   
   #Some final formatting ----

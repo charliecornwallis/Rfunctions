@@ -14,9 +14,6 @@
 # randomcovar_names =c("Phylogeny Carbs : Phylogeny Obligate","Phylogeny Protein : Phylogeny Obligate"," Phylogeny Fat : Phylogeny Obligate","Phylogeny EssAA : Phylogeny Obligate","Phylogeny NonEssAA : Phylogeny Obligate","Phylogeny Vit A : Phylogeny Obligate","Phylogeny Vit B : Phylogeny Obligate","Phylogeny Vit E : Phylogeny Obligate","Residual Carbs : Residual Obligate","Residual Protein : Residual Obligate"," Residual Fat : Residual Obligate","Residual EssAA : Residual Obligate","Residual NonEssAA : Residual Obligate","Residual Vit A : Residual Obligate","Residual Vit B : Residual Obligate","Residual Vit E : Residual Obligate")
 # cor_diffs = c("Noncoop Phylogeny temp within-year : Noncoop Phylogeny temp vs Pair Phylogeny temp within-year : Pair Phylogeny temp","Noncoop Phylogeny temp between-year : Noncoop Phylogeny temp vs Pair Phylogeny temp between-year : Pair Phylogeny temp")
 # padding=3
-# fixed_del="none"
-# fixed_grp=NULL
-# fixed_diffdel="none"
 # fixed_diffinc="all"
 # fixed_diff_diffs =NULL
 # Include_random = "yes"
@@ -64,15 +61,15 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   
   #Load packages and naming ----
   pacman::p_load(MCMCglmm,coda,openxlsx,stringdist,kableExtra)
-  
+
   #****************************************************
   #Check terms are specified correctly and relabel terms ----
   #****************************************************
-  if (is.null(fixed_names) &  fixed_diffinc != "none") {
+  if (is.null(fixed_names) & any(fixed_diffinc != "none")) {
     stop("fixed names needs to be specified for fixed_diffinc to be calculated")
   } else {
   }
-  
+
   #If response(s) not specified
   if (is.null(responses)) {
     
@@ -158,7 +155,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   }
   
   ##fixed_diffinc ----
-  if(fixed_diffinc == "none") {
+  if(any(fixed_diffinc == "none")) {
     fixed=fe1
   } else  {
     #Differences between fixed effects
@@ -387,7 +384,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   writeData(workbook, sheet, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
   row_nums = start_row+dim(header)[1] + dim(fixedeff)[1]+1
   
-  if(fixed_diffinc == "none") { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
+  if(any(fixed_diffinc == "none")) { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
   } else  {
     writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
     row_nums = row_nums + dim(fixeddiff)[1]+1

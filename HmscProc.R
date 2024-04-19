@@ -51,7 +51,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #****************************************************
   #Check terms are specified correctly ----
   #****************************************************
-  if (is.null(fixed_names) &  fixed_diffinc != "none") {
+  if (is.null(fixed_names) &  any(fixed_diffinc != "none")) {
     stop("fixed names needs to be specified for fixed_diffinc to be calculated")
   } else {
   }
@@ -132,7 +132,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   fe2<-pairwise.diffs(fixed_mod,nF=nF)
   
   ##fixed_diffinc ----
-  if(fixed_diffinc == "none") {
+  if(any(fixed_diffinc == "none")) {
     fixed=fe1
   } else  {
     fixed=rbind(fe1,fe2)
@@ -347,7 +347,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   writeData(workbook, sheet, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
   row_nums = start_row+dim(header)[1] + dim(fixedeff)[1]+1
   #Remove column headings if deleting fixed effects as it will be assessing higher order interactions where column names are not needed
-  if(fixed_diffinc == "none") { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
+  if(any(fixed_diffinc == "none")) { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
     } else  {
     writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
     row_nums = row_nums + dim(fixeddiff)[1]+1
@@ -548,7 +548,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     row_nums = start_row+dim(header)[1]+dim(fixedeff)[1]+2
     
     #Remove column headings if deleting fixed effects as it will be assessing higher order interactions where column names are not needed
-    if(fixed_diffinc_species == "none") { #Do not write fixeddiff dataframe if fixed_diffinc_species == "none"
+    if(any(fixed_diffinc_species == "none")) { #Do not write fixeddiff dataframe if fixed_diffinc_species == "none"
       } else  {
       writeData(workbook, sheet2, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
       row_nums = row_nums + dim(fixeddiff)[1] + 2

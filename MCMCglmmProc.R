@@ -507,6 +507,7 @@ xl_2_df2 = function(xltab,sheet=NULL){
 
 #function for df to Rmd table
 md_table = function(df){
+  pacman::p_load(kableExtra)
   if(length(grep("Random",df$`Fixed Effects`))>0 & length(grep("Correlations",df$`Fixed Effects`))>0) {
     Fixed<-df[1:(as.numeric(row.names(df[grepl("Random",df$`Fixed Effects`),]))-1),]
     Random<-df[as.numeric(row.names(df[grepl("Random",df$`Fixed Effects`),])):(as.numeric(row.names(df[grepl("Correlations",df$`Fixed Effects`),]))-1),]
@@ -530,6 +531,7 @@ md_table = function(df){
     column_spec(column=3, bold =rows_bold)}
 
 md_table2 = function(df){
+  pacman::p_load(kableExtra)
   kbl(df, align = "l", digits = 3) %>%
     kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11) %>%
     row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%

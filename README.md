@@ -3,6 +3,9 @@
 ASF_functions.R 
 - processes output from various models placing node estimates in dataframes facilitating parent descendent values
 
+MCMCeigen.R
+- Takes covariance matrices from multi-response MCMC models and outputs a list with 2 objects: 1) Compiles eigenvectors and eigenvalues for each iteration (object 1 in output list) and proportion of total eigenvalues explained by each eigenvector, and 2) posterior mode and HPDinterval summary of object 1.
+
 MCMCglmmProc.R
 - Processes output from MCMCglmm models into formatted tables.
 - Takes the following arguments:

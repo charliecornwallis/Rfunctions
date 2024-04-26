@@ -73,20 +73,13 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #If response(s) not specified
   if (is.null(responses)) {
     
-    convert_cbind_to_character <- function(input_string) {
-      # Extract column names
-      column_names <- gsub("cbind\\(|\\)\\(\\)", "", input_string)
-      column_names <- strsplit(column_names, ", ")[[1]]
-      
-      # Convert to a character vector
-      column_names <- trimws(column_names)
-      
-      return(column_names)
+    if(length(link) ==1){
+      responses = model$Fixed$formula[2]
+      responses = sub("()","",responses)
+      }
+    else {
+      stop("Need to specify responses for multi-response models")
     }
-    #multi-response models
-    responses = convert_cbind_to_character(model$Fixed$formula[2])
-    #single response models
-    responses = sub("()","",responses)
     
   } else {
     responses = responses
@@ -493,7 +486,7 @@ xl_2_df = function(xltab,sheet=NULL){
   df<-readWorkbook(xltab,sheet=sheet)
   colnames(df)<-df[1,]
   colnames(df)<-gsub("[.]"," ",colnames(df))
-  df<-df %>% filter(pMCMC != "" & row_number() != 1)
+  df<-df %>% dplyr::filter(pMCMC != "" & dplyr::row_number() != 1)
   rownames(df)<-NULL
   return(df)
 }
@@ -524,6 +517,7 @@ md_table = function(df){
   kbl(df, align = "l", digits = 3) %>%
     kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11) %>%
     row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
+    row_spec(grep("^Fixed Effect Comparisons",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Random",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Correlations",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Correlation comparions",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%

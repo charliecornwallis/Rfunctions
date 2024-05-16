@@ -2,7 +2,7 @@
 #Function for processing Hmsc models#
 #***************************************
 
-HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",traits="include",pvalues = "include",VP_ave = "include",randomvar_names=NULL,Include_random = "yes",Include_species ="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",padding=4,dec_PM=2)
+HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",traits="exclude",pvalues = "include",VP_ave = "include",randomvar_names=NULL,Include_random = "yes",Include_species ="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",padding=4,dec_PM=2)
 { 
   #Explanation ----
   #1. Takes an Hmsc model and combines estimates from multiple chains and output 2 excel sheets: 1) averages across species; 2) Per species values. If there are multiple species these are averaged per mcmc sample using rowMeans to produce posterior distribution of average effects.
@@ -347,14 +347,14 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   writeData(workbook, sheet, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
   row_nums = start_row+dim(header)[1] + dim(fixedeff)[1]+1
   #Remove column headings if deleting fixed effects as it will be assessing higher order interactions where column names are not needed
-  if(any(fixed_diffinc == "none")) { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
+  if(any(fixed_diffinc == "none")) { #Do not write fixeddiffinc dataframe if = "none"
     } else  {
     writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
     row_nums = row_nums + dim(fixeddiff)[1]+1
     }
   
   #Trait effects
-  if(traits=="include") { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
+  if(traits=="include") { #Write trait effects if = "include"
     writeData(workbook, sheet, ge1, startCol = 1, startRow = row_nums,headerStyle = hs2)
     row_nums = row_nums + dim(ge1)[1]+1
     } else  {
@@ -548,7 +548,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     row_nums = start_row+dim(header)[1]+dim(fixedeff)[1]+2
     
     #Remove column headings if deleting fixed effects as it will be assessing higher order interactions where column names are not needed
-    if(any(fixed_diffinc_species == "none")) { #Do not write fixeddiff dataframe if fixed_diffinc_species == "none"
+    if(any(fixed_diffinc_species == "none")) { #Do not write fixed_diffinc_species if "none"
       } else  {
       writeData(workbook, sheet2, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
       row_nums = row_nums + dim(fixeddiff)[1] + 2

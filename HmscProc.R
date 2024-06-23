@@ -8,7 +8,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #1. Takes an Hmsc model and combines estimates from multiple chains and output 2 excel sheets: 1) averages across species; 2) Per species values. If there are multiple species these are averaged per mcmc sample using rowMeans to produce posterior distribution of average effects.
   #2. Estimates posterior modes and HPDintervals for effects
   #3. Calculates specified differences for fixed effects
-  #4. For models with trait data, combines runs and 
+  #4. For models with trait data, combines runs and estimates trait effects
   #5. Calculates average variance explained by random effects
   #6. Calculates % variation of explained by fixed and random effects 
   #7. For models with phylogenetic effects it outputs Rho

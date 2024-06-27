@@ -14,6 +14,7 @@
 # randomcovar_names =c("Phylogeny Carbs : Phylogeny Obligate","Phylogeny Protein : Phylogeny Obligate"," Phylogeny Fat : Phylogeny Obligate","Phylogeny EssAA : Phylogeny Obligate","Phylogeny NonEssAA : Phylogeny Obligate","Phylogeny Vit A : Phylogeny Obligate","Phylogeny Vit B : Phylogeny Obligate","Phylogeny Vit E : Phylogeny Obligate","Residual Carbs : Residual Obligate","Residual Protein : Residual Obligate"," Residual Fat : Residual Obligate","Residual EssAA : Residual Obligate","Residual NonEssAA : Residual Obligate","Residual Vit A : Residual Obligate","Residual Vit B : Residual Obligate","Residual Vit E : Residual Obligate")
 # cor_diffs = c("Noncoop Phylogeny temp within-year : Noncoop Phylogeny temp vs Pair Phylogeny temp within-year : Pair Phylogeny temp","Noncoop Phylogeny temp between-year : Noncoop Phylogeny temp vs Pair Phylogeny temp between-year : Pair Phylogeny temp")
 # padding=3
+# ginv="animal"
 # fixed_diffinc="all"
 # fixed_diff_diffs =NULL
 # Include_random = "yes"
@@ -38,7 +39,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #sheet= name of sheet "Analysis 1"
   #title = Title of table in e.g. "Table 1"
   #fixed_names = what you want fixed effects to be called e.g c("Intercept","Season length")
-  #fixed_diffinc = same as fixed_diffdel but for specific terms to be included in output
+  #fixed_diffinc = differences between fixed effects to be included in output. Terms that come first in fixed_names have to come first in the comparison.
   #fixed_diff_diffs = calculates differences between differences e.g. c("effect1 vs effect2 - effect3 vs effect4"). Must exactly match names of fixed effects and be separate by " - "
   #variances = names of variance terms in VCV object either indices or written. Must be as they appear in the model object not the renamed. If left as NULL then taken from the model object.
   #covariances = names of covariance terms in VCV object either indices or written. Must be as they appear in the model object not the renamed. If left as NULL then they are not outputted.
@@ -93,6 +94,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   colnames(model$VCV) <- sub(ginv, "animal", colnames(model$VCV))
   variances <- sub(ginv, "animal", variances)
 
+  
   #Rename model fixed effects
   if(is.null(fixed_names)) {
     fixed_names<- colnames(model$Sol)
@@ -128,11 +130,12 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   {if(is.matrix(x) & nF>1) {
     #Differences
     # create column combination pairs
-    prs <- cbind(rep(1:ncol(x), each = ncol(x)), 1:ncol(x))
-    col.diffs <- prs[prs[, 1] < prs[, 2], , drop = FALSE]
+    col.diffs <- cbind(rep(1:ncol(x), each = ncol(x)), 1:ncol(x))
+    #col.diffs <- col.diffs[col.diffs[, 1] < col.diffs[, 2], , drop = FALSE]
     
     #pairwise differences 
     result <- x[, col.diffs[, 1]] - x[, col.diffs[, 2], drop = FALSE]
+    
     # set colnames
     if(is.null(colnames(x)))
       colnames(x) <- 1:ncol(x)

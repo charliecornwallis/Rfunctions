@@ -289,9 +289,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
       }
       
       #Need to rename colnames to match randomvar_names & need to account for models with more than 1 residual variance notation
-      if(length(model$Residual$nfl)>0) {
-        number_random=length(model$Random$nfl)+length(model$Residual$nfl) #add residual variance
-        colnames(t_icc)<-randomvar_names[seq(from=i,to=number_random*length(responses),by=length(responses))]
+      if(model$Residual$nfl>0) {
+        number_random=length(model$Random$nfl)+model$Residual$nfl #add residual variance
+        colnames(t_icc)<-randomvar_names[seq(from=i,to=number_random,by=length(responses))]
         icc_all<-cbind(icc_all,t_icc)
       } else  {
         colnames(t_icc)<-randomvar_names[seq(from=i,to=i+length(responses)*length(model$Random$nfl),by=length(responses))]

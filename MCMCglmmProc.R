@@ -5,7 +5,7 @@
 #Trouble shooting tools----
 # model=M4.2.1.1ns
 # responses=c("ob_host","ZavestanCarb", "ZavestanFat","ZavestanProtein","ZavestanEssAA", "ZavestanNonessAA","ZavestanA","ZavestanB","ZavestanE")
-# link=c("logit","gaussian","gaussian","gaussian","gaussian","gaussian","gaussian","gaussian","gaussian")
+# dist_var=c(0)
 # fixed_names=c("Obligate %","Carbohydrates","Fat","Protein","EssAA","NonEssAA","Vitamin A","Vitamin B","Vitamin E")
 # Include_random = "yes"
 # variances=variances=c("traitob_host:traitob_host.animal","traitZavestanCarb:traitZavestanCarb.animal","traitZavestanProtein:traitZavestanProtein.animal","traitZavestanFat:traitZavestanFat.animal","traitZavestanEssAA:traitZavestanEssAA.animal","traitZavestanNonessAA:traitZavestanNonessAA.animal","traitZavestanA:traitZavestanA.animal","traitZavestanB:traitZavestanB.animal","traitZavestanE:traitZavestanE.animal","traitob_host:traitob_host.units","traitZavestanCarb:traitZavestanCarb.units","traitZavestanProtein:traitZavestanProtein.units","traitZavestanFat:traitZavestanFat.units","traitZavestanEssAA:traitZavestanEssAA.units","traitZavestanNonessAA:traitZavestanNonessAA.units","traitZavestanA:traitZavestanA.units","traitZavestanB:traitZavestanB.units","traitZavestanE:traitZavestanE.units")
@@ -26,13 +26,14 @@
 
 #Function ----
 
-MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",cor_diffs=NULL)
+MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=c(0),ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",cor_diffs=NULL)
 { 
   #Explanation of terms ----
   #model = MCMCglmm model
   #response = list of responses (e.g. c(trait1,trait2))
-  #link = link functions used for each response variable (e.g. c("logit","gaussian")). Changes the calculation of ICCs by adding distribution variances.
+  #dist_var = distribution variance associated with link function: e.g."gaussian2 = 0, "log" = log(1 + log(exp(intercept + 0.5*sumRE)), "logit" = pi^2/3, "probit" = 1. This is a complicated issue and should be given careful thought: see Nakagawa et al 2017
   #S2var = sampling variance if known - useful for meta-analyses
+  #For Multi-response models can provide a list of dist_var and S2var corresponding to each response trait
   #start_row=starting row of workbook to add data to if NULL put data in first empty row 
   #workbook = adds data if specified, otherwise will make a new e.g. Results
   #create_sheet = should a new sheet be created e.g."yes" vs "no"
@@ -48,8 +49,6 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #Include_random = should random effects be included in output
   #Padding = space between tables when outputting multiple models to same sheet
   #dec_PM = number of decimals given for posterior mode and CIs of fixed and random effects
-  #link = allows logit & probit, the default is gaussian, and is used to calculate ICCs correctly. Gaussian can also be used for poisson (log) models to produce ICCs on expected scale but NOT for data scale estimates. See de Villemereuil 2016 Genetics & QGglmm package for details.
-  #For Multi-response models can provide a list of link functions (e.g. c("gaussian","logit")) corresponding to each response trait
   #responses = specify response variables can take multiple values for multi response
   #pvalues = exclusion of pMCMC values for fixed effects - "exclude", "include" or "c(?,?...)" giving list of which p values to exclude. Note pMCMC will still be calculated for fixed effect comparisons
   #cor_diff = calculates differences between correlations. Should be specified in the same way as fixed_diffs e.g. c("cor1 vs cor2","cor1 vs cor3"...) 
@@ -74,7 +73,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   #If response(s) not specified
   if (is.null(responses)) {
     
-    if(length(link) ==1){
+    if(length(dist_var) ==1){
       responses = model$Fixed$formula[2]
       responses = sub("()","",responses)
       }
@@ -253,13 +252,6 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
   
   #Calculate % variation explained by each random effect
   
-  #Distribution variances
-  link_var<-link
-  link_var[link_var=="gaussian"]<-0
-  link_var[link_var=="poisson"]<-0
-  link_var[link_var=="logit"]<-pi^2/3
-  link_var[link_var=="probit"]<-1
-  
   #Setup sampling variances for multi-response models
   if(length(responses)>1 & sum(S2var) ==0){
     S2var<-rep(0,length(responses))
@@ -276,7 +268,8 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
       colnames(tvar)<-variances
       tvar<-tvar[,grepl(paste0(responses[i],"."),colnames(tvar),fixed=T)]
       tsumvar<-rowSums(tvar) #Calculate sum of variances
-      tsumvar<-tsumvar + as.numeric(link_var[i]) #Add distribution variance
+      
+      tsumvar<-tsumvar + dist_var[i] #Add distribution variance
       tot_tsumvar<-tsumvar+S2var[i] #Add sampling variance
       
       if(any(grepl("animal",colnames(tvar)))) {
@@ -290,7 +283,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
       
       #Need to rename colnames to match randomvar_names & need to account for models with more than 1 residual variance notation
       if(model$Residual$nfl>0) {
-        number_random=length(model$Random$nfl)+model$Residual$nfl #add residual variance
+        number_random=model$Random$nfl+model$Residual$nfl #add residual variance
         colnames(t_icc)<-randomvar_names[seq(from=i,to=number_random,by=length(responses))]
         icc_all<-cbind(icc_all,t_icc)
       } else  {
@@ -306,7 +299,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
     tvar<-var_terms
     colnames(tvar)<-variances
     tsumvar<-rowSums(tvar) #calculate sum of variances
-    tsumvar<-tsumvar + as.numeric(link_var[1]) #Add distribution variance
+    tsumvar<-tsumvar + dist_var[1] #Add distribution variance
     tot_tsumvar<-tsumvar+S2var #Add sampling variance
     
     if(any(grepl("animal",colnames(tvar)))) {
@@ -486,7 +479,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,link=c("gaussian"),ginv="animal
 
 #function for extracting df from xl workbook
 xl_2_df = function(xltab,sheet=NULL){
-  df<-readWorkbook(xltab,sheet=sheet)
+  df<-readWorkbook(xltab,sheet=sheet,startRow=1)
   colnames(df)<-df[1,]
   colnames(df)<-gsub("[.]"," ",colnames(df))
   df<-df %>% dplyr::filter(pMCMC != "" & dplyr::row_number() != 1)
@@ -523,8 +516,8 @@ md_table = function(df){
     row_spec(grep("^Fixed Effect Comparisons",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Random",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Correlations",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
-    row_spec(grep("^Correlation comparions",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
-    row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px")%>%
+    row_spec(grep("^Correlation comparions",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") %>%
+    row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") %>%
     column_spec(column=3, bold =rows_bold)}
 
 md_table2 = function(df){

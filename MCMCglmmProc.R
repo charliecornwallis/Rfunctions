@@ -283,7 +283,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=c(0),ginv="animal",S2v
       
       #Need to rename colnames to match randomvar_names & need to account for models with more than 1 residual variance notation
       if(model$Residual$nfl>0) {
-        number_random=model$Random$nfl+model$Residual$nfl #add residual variance
+        number_random=sum(model$Random$nfl)+sum(model$Residual$nfl) #add up random variances and residual variances
         colnames(t_icc)<-randomvar_names[seq(from=i,to=number_random,by=length(responses))]
         icc_all<-cbind(icc_all,t_icc)
       } else  {

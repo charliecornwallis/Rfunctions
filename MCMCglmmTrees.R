@@ -1,28 +1,28 @@
-prior=list(R=list(R1=list(V=diag(6), nu=5.002)),
-           G=list(G1=list(V=diag(6), nu=5.002),
-                  G2=list(V=diag(6), nu=5.002),
-                  G3=list(V=diag(6), nu=5.002)))
-treetoburn=0
-data=dat
-samples=10
-trees=trees
-tiplabel=dat$animal
-fixed=as.formula(cbind(Ztemp,Zsqrt_precip,Zsqrt_temp_sd,Zsqrt_precip_sd,Zsqrt_temp_sd_byrs,Zsqrt_precip_sd_byrs)~
-                   at.level(fam_non,'Pair'):trait+
-                   at.level(fam_non,'Family'):trait+
-                   at.level(fam_non,'Nonfamily'):trait-1)
-random=as.formula(~ us(at.level(fam_non,'Pair'):trait):animal+
-                    us(at.level(fam_non,'Family'):trait):animal+
-                    us(at.level(fam_non,'Nonfamily'):trait):animal)
-residual=as.formula(~us(trait):units)
-Gnumber=3
-Rnumber=1
-Geffects=c((6*6),(6*6),(6*6))
-Reffects=(6*6)
-family=c("gaussian","gaussian","gaussian","gaussian","gaussian","gaussian")
-nitts_tree=1
-thins_tree=1
-burns_tree=0
+# prior=list(R=list(R1=list(V=diag(6), nu=5.002)),
+#            G=list(G1=list(V=diag(6), nu=5.002),
+#                   G2=list(V=diag(6), nu=5.002),
+#                   G3=list(V=diag(6), nu=5.002)))
+# treetoburn=0
+# data=dat
+# samples=10
+# trees=trees
+# tiplabel=dat$animal
+# fixed=as.formula(cbind(Ztemp,Zsqrt_precip,Zsqrt_temp_sd,Zsqrt_precip_sd,Zsqrt_temp_sd_byrs,Zsqrt_precip_sd_byrs)~
+#                    at.level(fam_non,'Pair'):trait+
+#                    at.level(fam_non,'Family'):trait+
+#                    at.level(fam_non,'Nonfamily'):trait-1)
+# random=as.formula(~ us(at.level(fam_non,'Pair'):trait):animal+
+#                     us(at.level(fam_non,'Family'):trait):animal+
+#                     us(at.level(fam_non,'Nonfamily'):trait):animal)
+# residual=as.formula(~us(trait):units)
+# Gnumber=3
+# Rnumber=1
+# Geffects=c((6*6),(6*6),(6*6))
+# Reffects=(6*6)
+# family=c("gaussian","gaussian","gaussian","gaussian","gaussian","gaussian")
+# nitts_tree=1
+# thins_tree=1
+# burns_tree=0
 
 #***************************************
 #Function for sampling of across trees using MCMCglmm models#

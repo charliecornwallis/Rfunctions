@@ -397,13 +397,6 @@ scm_pred_trans<-function(trees,scm_model,dat,species,trait_raw){
 #******************************************************************************************
 #HMM predicted ancestral states
 #******************************************************************************************
-trees = trees_no_outgroups[1:2]
-hmm_model = multHMM_1
-dat = hmm_multi
-species = "tip"
-trait_raw= "multi_cat"
-node.states="marginal"
-
 hmm_pred_states<-function(trees,hmm_model,dat,species,trait_raw,node.states="marginal"){
   rate_mat = getStateMat4Dat(dat) # to retrieve state names
   
@@ -425,7 +418,7 @@ hmm_pred_states<-function(trees,hmm_model,dat,species,trait_raw,node.states="mar
       results = dplyr::bind_rows(results)
       
       #Create column with most likely state
-      results$states <- apply(results[, -c(1:2)], 1, function(row) {
+      results$state <- apply(results[, -c(1:2)], 1, function(row) {
         colnames(results)[-c(1:2)][which.max(row)]
       })
       
@@ -443,7 +436,7 @@ hmm_pred_states<-function(trees,hmm_model,dat,species,trait_raw,node.states="mar
       }
       results = dplyr::bind_rows(results)
       #replace numerical states with trait states
-      results$states = rate_mat$legend[match(results$states,names(rate_mat$legend))]
+      results$state = rate_mat$legend[match(results$state,names(rate_mat$legend))]
     }
     
   } else  {
@@ -457,7 +450,7 @@ hmm_pred_states<-function(trees,hmm_model,dat,species,trait_raw,node.states="mar
       colnames(results) = c("species",rate_mat$legend)
     
       #Create column with most likely state
-      results$states <- apply(results[, -1], 1, function(row) {
+      results$state <- apply(results[, -1], 1, function(row) {
         colnames(results)[-1][which.max(row)]
       })
       
@@ -472,7 +465,7 @@ hmm_pred_states<-function(trees,hmm_model,dat,species,trait_raw,node.states="mar
     #predicted ancestral states
     results = data.frame(species=c(trees$node.label,trees$tip.label),states=c(hmm_model$states,hmm_model$tip.states))
     #replace numerical states with trait states
-    results$states = rate_mat$legend[match(results$states,names(rate_mat$legend))]
+    results$state = rate_mat$legend[match(results$state,names(rate_mat$legend))]
     }
   }
 

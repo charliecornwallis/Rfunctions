@@ -221,7 +221,7 @@ scm_pred_states<-function(trees,scm_model,dat,species,trait_raw){
   
   if(is.null(trees$tip.label)) {
     
-    #Multiple trees
+    #Multiple trees with multiple maps per tree
     results <- vector("list", length(scm_model))
     #predicted ancestral states
     nodes<-data.frame(getStates(scm_model,type=c("nodes")))
@@ -253,6 +253,8 @@ scm_pred_states<-function(trees,scm_model,dat,species,trait_raw){
     
     
   } else  {
+    
+    #Single tree with multiple maps
     results <- vector("list", length(scm_model))
     
     #predicted ancestral states
@@ -292,70 +294,103 @@ scm_pred_states<-function(trees,scm_model,dat,species,trait_raw){
 #******************************************************************************************
 #SCM processing to transition dataset 
 #******************************************************************************************
+trees=tree_no_outgroups
+scm_model=multSCM
+dat=dat_sp
+species="tip"
+trait_raw="multi_cat"
 
 scm_pred_trans<-function(trees,scm_model,dat,species,trait_raw){
-  dat = as.data.frame(dat)
+  
+  dat = as.data.frame(dat) # remove any formatting
+  
   #if trees$tip.label is null then must be list of trees
   if(is.null(trees$tip.label)) {
     
-    #Multiple trees
-    
-    #Create a dataframe that gives estimate for each node & tip for each tree - assumes model = tree are in same order
+    #Multiple trees with multiple maps per tree
     results <- vector("list", length(scm_model))
-    
     #predicted ancestral states
     nodes<-data.frame(getStates(scm_model,type=c("nodes")))
     tips<-data.frame(getStates(scm_model,type=c("tips")))
     maps_per_tree = length(scm_model)/length(trees)
     
     for(i in 1:length(scm_model)) {
-      pred_states<-data.frame(species=c(scm_model[[i]]$node.label,scm_model[[i]]$tip.label),states=c(nodes[,i],tips[,i]))
-      
-      #make transition dataset
-      tree<-scm_model[[i]]
-      tree_df<-tidytree::as_tibble(tree)
-      tree_df <- data.frame(ancestor=tree_df$label[match(tree_df$parent,tree_df$node)],
-                            descendant=tree_df$label,
-                            label_no=tree_df$node,
-                            branch.length=tree_df$branch.length)
-      tree_df <- tree_df %>% dplyr::filter(ancestor != descendant) %>%
-        dplyr::mutate(anc_state=pred_states$states[match(ancestor,pred_states$species)],
-               des_state=pred_states$states[match(descendant,pred_states$species)]) 
-      
-      #work out descendant nodes
-      trans <- tree_df %>% dplyr::arrange(ancestor) %>%
-        dplyr::mutate(des=rep(c("des1","des2"),length(unique(ancestor)))) %>% 
-        tidyr::pivot_wider(id_cols=c(ancestor,anc_state),names_from=c(des),values_from = c(des_state)) %>%
-        dplyr::mutate(des_comb=paste(des1,des2,sep=".")) 
-
-      tree_df$des_comb<-trans$des_comb[match(tree_df$ancestor,trans$ancestor)]
-      tree_df$tree=ceiling(i/maps_per_tree)
-      tree_df$map=i
-      results[[i]]<-tree_df
+      pred_states<-data.frame(tree=ceiling(i/maps_per_tree),map=i,species=c(scm_model[[i]]$node.label,scm_model[[i]]$tip.label),states=c(nodes[,i],tips[,i]))
+      results[[i]]<-pred_states
     }
-  } else  {
-    #Single tree, multiple maps
+    results = dplyr::bind_rows(results)
     
-    #Create a dataframe that gives estimate for each node & tip for each tree - assumes model = tree are in same order
+    results = results %>% dplyr::group_by(tree,species,states) %>% dplyr::summarise(n=n()) 
+    results = results %>% tidyr::pivot_wider(names_from=states,values_from = n) %>% 
+      dplyr::mutate(across(where(is.numeric), ~replace_na(., 0)))
+    
+    #Convert numbers to proportion of maps
+    results[,2:length(results)] = results[,2:length(results)]/length(scm_model)
+    
+    #Create column with most likely state
+    results$state <- apply(results[, -1], 1, function(row) {
+      colnames(results)[-1][which.max(row)]
+    })
+    
+    #Create column with probability of most likely state 
+    results$prob_state <- apply(results[, 2:(length(results)-1)], 1, function(row) {
+      max(row)
+    })
+    
+    
+  } else  {
+    
+    #Single tree with multiple maps
     results <- vector("list", length(scm_model))
     
     #predicted ancestral states
     nodes<-data.frame(getStates(scm_model,type=c("nodes")))
     tips<-data.frame(getStates(scm_model,type=c("tips")))
-    
     for(i in 1:length(scm_model)) {
-      pred_states<-data.frame(species=c(scm_model[[i]]$node.label,scm_model[[i]]$tip.label),states=c(nodes[,i],tips[,i]))
-      
-      #make transition dataset
-      tree<-scm_model[[i]]
+      pred_states<-data.frame(map=i,species=c(scm_model[[i]]$node.label,scm_model[[i]]$tip.label),states=c(nodes[,i],tips[,i]))
+      results[[i]]<-pred_states
+    }
+    
+    results<-dplyr::bind_rows(results)
+    
+    results = results %>% dplyr::group_by(species,states) %>% dplyr::summarise(n=n()) 
+    results = results %>% tidyr::pivot_wider(names_from=states,values_from = n) %>% 
+      dplyr::mutate(across(where(is.numeric), ~replace_na(., 0)))
+    
+    #Convert numbers to proportion of maps
+    results[,2:length(results)] = results[,2:length(results)]/length(scm_model)
+    
+    #Create column with most likely state
+    results$state <- apply(results[, -1], 1, function(row) {
+      colnames(results)[-1][which.max(row)]
+    })
+    
+    #Create column with probability of most likely state 
+    results$prob_state <- apply(results[, 2:(length(results)-1)], 1, function(row) {
+      max(row)
+    })
+  }
+  results = as.data.frame(results)
+  
+  #***********************************************
+  #create data frame with ancestor and descendents
+  if(is.null(trees$tip.label)) {
+    
+    results2 <- vector("list", length(scm_model))
+    
+    #make transition dataset for each tree
+    for(i in 1:length(trees)) {
+      tree<-trees[[i]]
       tree_df<-tidytree::as_tibble(tree)
       tree_df <- data.frame(ancestor=tree_df$label[match(tree_df$parent,tree_df$node)],
                             descendant=tree_df$label,
                             label_no=tree_df$node,
                             branch.length=tree_df$branch.length)
       tree_df <- tree_df %>% dplyr::filter(ancestor != descendant) %>%
-        dplyr::mutate(anc_state=pred_states$states[match(ancestor,pred_states$species)],
-                      des_state=pred_states$states[match(descendant,pred_states$species)]) 
+        dplyr::mutate(anc_state=results$state[match(ancestor,results$species)],
+                      anc_prob=results$prob_state[match(ancestor,results$species)],
+                      des_state=results$state[match(descendant,results$species)],
+                      des_prob=results$prob_state[match(descendant,results$species)]) 
       
       #work out descendant nodes
       trans <- tree_df %>% dplyr::arrange(ancestor) %>%
@@ -363,41 +398,48 @@ scm_pred_trans<-function(trees,scm_model,dat,species,trait_raw){
         tidyr::pivot_wider(id_cols=c(ancestor,anc_state),names_from=c(des),values_from = c(des_state)) %>%
         dplyr::mutate(des_comb=paste(des1,des2,sep=".")) 
       
+      #add in information on both descendents
       tree_df$des_comb<-trans$des_comb[match(tree_df$ancestor,trans$ancestor)]
-      tree_df$map=i
-      results[[i]]<-tree_df
-    }
+      tree_df = data.frame(tree=i,tree_df)
+      results2[[i]]<-tree_df 
+    }  
+    results2<-dplyr::bind_rows(results2)
+    
+  } else  {
+    tree_df<-tidytree::as_tibble(trees)
+    tree_df <- data.frame(ancestor=tree_df$label[match(tree_df$parent,tree_df$node)],
+                          descendant=tree_df$label,
+                          label_no=tree_df$node,
+                          branch.length=tree_df$branch.length)
+    tree_df <- tree_df %>% dplyr::filter(ancestor != descendant) %>%
+      dplyr::mutate(anc_state=results$state[match(ancestor,results$species)],
+                    anc_prob=results$prob_state[match(ancestor,results$species)],
+                    des_state=results$state[match(descendant,results$species)],
+                    des_prob=results$prob_state[match(descendant,results$species)]) 
+    
+    #work out descendant nodes
+    trans <- tree_df %>% dplyr::arrange(ancestor) %>%
+      dplyr::mutate(des=rep(c("des1","des2"),length(unique(ancestor)))) %>% 
+      tidyr::pivot_wider(id_cols=c(ancestor,anc_state),names_from=c(des),values_from = c(des_state)) %>%
+      dplyr::mutate(des_comb=paste(des1,des2,sep=".")) 
+    
+    #add in information on both descendents
+    tree_df$des_comb<-trans$des_comb[match(tree_df$ancestor,trans$ancestor)]
+    results2<-tree_df
   }
   
-  results<-dplyr::bind_rows(results)
-  
-  results = results %>% dplyr::group_by(ancestor,descendant,label_no,branch.length,des_comb) %>% dplyr::summarise(n=n()) 
-  results = results %>% tidyr::pivot_wider(names_from=des_comb,values_from = n) %>% 
-    dplyr::mutate(across(where(is.numeric), ~replace_na(., 0)))
-  
-  #Convert numbers to proportion of maps
-  results[,5:length(results)] = results[,5:length(results)]/length(scm_model)
-  
-  #Create column with most likely state
-  results$des_comb <- apply(results[, -c(1:5)], 1, function(row) {
-    colnames(results)[-c(1:5)][which.max(row)]
-  })
-  
-  #Create column with probability of most likely state 
-  results$prob_state <- apply(results[, 5:(length(results)-1)], 1, function(row) {
-    max(row)
-  })
-  results = as.data.frame(results)
-  dat = as.data.frame(dat)
-  results$raw_state<-dat[,trait_raw][match(results$descendant,dat[,species])]
-  rownames(results)=NULL
-  return(results)
-}  
+  results2$raw_state = dat[,trait_raw][match(results2$descendant,dat[,species])]
+  rownames(results2)=NULL
+  return(results2)
+}
 
 #******************************************************************************************
 #HMM predicted ancestral states
 #******************************************************************************************
 hmm_pred_states<-function(trees,hmm_model,dat,species,trait_raw,node.states="marginal"){
+  
+  dat = as.data.frame(dat) # remove any formatting
+  
   rate_mat = getStateMat4Dat(dat) # to retrieve state names
   
   #if trees$tip.label is null then must be list of trees
@@ -485,8 +527,10 @@ hmm_pred_states<-function(trees,hmm_model,dat,species,trait_raw,node.states="mar
 # node.states="marginal"
 
 hmm_pred_trans<-function(trees,hmm_model,dat,species,trait_raw,node.states="marginal"){
-  dat = as.data.frame(dat)
-  rate_mat = getStateMat4Dat(dat)
+  
+  dat = as.data.frame(dat) # remove any formatting
+  
+  rate_mat = getStateMat4Dat(dat) # to retrieve state names
   
 #if trees$tip.label is null then must be list of trees
   if(is.null(trees$tip.label)) {
@@ -529,6 +573,8 @@ hmm_pred_trans<-function(trees,hmm_model,dat,species,trait_raw,node.states="marg
           tidyr::pivot_wider(id_cols=c(ancestor,anc_state),names_from=c(des),values_from = c(des_state)) %>%
           dplyr::mutate(des_comb=paste(des1,des2,sep=".")) 
         
+        #add in information on both descendents
+        tree_df$des_comb<-trans$des_comb[match(tree_df$ancestor,trans$ancestor)]
         tree_df = data.frame(tree=i,tree_df)
         results[[i]]<-tree_df 
       }
@@ -558,6 +604,8 @@ hmm_pred_trans<-function(trees,hmm_model,dat,species,trait_raw,node.states="marg
         tidyr::pivot_wider(id_cols=c(ancestor,anc_state),names_from=c(des),values_from = c(des_state)) %>%
         dplyr::mutate(des_comb=paste(des1,des2,sep=".")) 
       
+      #add in information on both descendents
+      tree_df$des_comb<-trans$des_comb[match(tree_df$ancestor,trans$ancestor)]
       tree_df = data.frame(tree=i,tree_df)
       results[[i]]<-tree_df
     }
@@ -600,6 +648,8 @@ hmm_pred_trans<-function(trees,hmm_model,dat,species,trait_raw,node.states="marg
         tidyr::pivot_wider(id_cols=c(ancestor,anc_state),names_from=c(des),values_from = c(des_state)) %>%
         dplyr::mutate(des_comb=paste(des1,des2,sep=".")) 
       
+      #add in information on both descendents
+      tree_df$des_comb<-trans$des_comb[match(tree_df$ancestor,trans$ancestor)]
       results<-tree_df
       
     } else  { 
@@ -626,13 +676,13 @@ hmm_pred_trans<-function(trees,hmm_model,dat,species,trait_raw,node.states="marg
       tidyr::pivot_wider(id_cols=c(ancestor,anc_state),names_from=c(des),values_from = c(des_state)) %>%
       dplyr::mutate(des_comb=paste(des1,des2,sep=".")) 
     
+    #add in information on both descendents
+    tree_df$des_comb<-trans$des_comb[match(tree_df$ancestor,trans$ancestor)]
     results<-tree_df
   }
 }  
   #add in information on both descendents
-  
-  results$des_comb<-trans$des_comb[match(tree_df$ancestor,trans$ancestor)]
-  
+
   results$raw_state = dat[,trait_raw][match(results$descendant,dat[,species])]
   rownames(results)=NULL
   return(results)

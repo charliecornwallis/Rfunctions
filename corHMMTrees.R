@@ -1,7 +1,7 @@
 #******************************************************************************************
 #HMM models run on list of trees
 #******************************************************************************************
-hmm_trees<-function(trees,data,rate_cats=1,node.states="joint"){
+corHMMTrees<-function(trees,data,rate_cats=1,node.states="joint"){
   results <- vector("list", length(trees))
   
   for(i in 1:length(trees)) {

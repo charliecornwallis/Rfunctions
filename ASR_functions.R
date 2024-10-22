@@ -397,30 +397,85 @@ scm_pred_trans<-function(trees,scm_model,dat,species,trait_raw){
 #******************************************************************************************
 #HMM predicted ancestral states
 #******************************************************************************************
+trees = trees_no_outgroups[1:2]
+hmm_model = multHMM_1
+dat = hmm_multi
+species = "tip"
+trait_raw= "multi_cat"
+node.states="marginal"
 
-hmm_pred_states<-function(trees,hmm_model,dat,species,trait_raw){
-  #if trees$tip.label is null then must be list of trees
+hmm_pred_states<-function(trees,hmm_model,dat,species,trait_raw,node.states="marginal"){
+  rate_mat = getStateMat4Dat(dat) # to retrieve state names
   
+  #if trees$tip.label is null then must be list of trees
   if(is.null(trees$tip.label)) {
     
-    #Multiple trees
+#Multiple trees
     results <- vector("list", length(hmm_model))#use length(hmm_model) here and  length(trees) to ensure they are same length (will throw and error if not)
     
-    for(i in 1:length(trees)) {
+    if(node.states=="marginal"){
+
+#Multiple trees with probability of each node / species
+      for(i in 1:length(trees)) {
+      states = round(rbind(hmm_model[[i]]$states,hmm_model[[i]]$tip.states),4)
+      pred_states = data.frame(tree=i,species=c(trees[[i]]$node.label,trees[[i]]$tip.label),states)
+      colnames(pred_states) = c("tree","species",rate_mat$legend)
+      results[[i]]<-pred_states 
+      }
+      results = dplyr::bind_rows(results)
+      
+      #Create column with most likely state
+      results$states <- apply(results[, -c(1:2)], 1, function(row) {
+        colnames(results)[-c(1:2)][which.max(row)]
+      })
+      
+      #Create column with probability of most likely state 
+      results$prob_state <- apply(results[, 3:(length(results)-1)], 1, function(row) {
+        max(row)
+      }) 
+
+#Multiple trees with mosty likely node / species     
+      } else  {  
+      
+      for(i in 1:length(trees)) {  
       pred_states<-data.frame(tree=i,species=c(trees[[i]]$node.label,trees[[i]]$tip.label),states=c(hmm_model[[i]]$states,hmm_model[[i]]$tip.states))
       results[[i]]<-pred_states
+      }
+      results = dplyr::bind_rows(results)
+      #replace numerical states with trait states
+      results$states = rate_mat$legend[match(results$states,names(rate_mat$legend))]
     }
-    results = dplyr::bind_rows(results)
     
   } else  {
+
+#Single tree with probability of each node / species    
+    #If marginal then probabilities of each state given, joint = most likely state so needs different processing
+    if(node.states=="marginal"){
+      #predicted ancestral states
+      states = round(rbind(hmm_model$states,hmm_model$tip.states),4)
+      results = data.frame(species=c(trees$node.label,trees$tip.label),states)
+      colnames(results) = c("species",rate_mat$legend)
     
+      #Create column with most likely state
+      results$states <- apply(results[, -1], 1, function(row) {
+        colnames(results)[-1][which.max(row)]
+      })
+      
+      #Create column with probability of most likely state 
+      results$prob_state <- apply(results[, 2:(length(results)-1)], 1, function(row) {
+        max(row)
+      }) 
+      
+      } else {
+
+#Single tree with most likely node / species       
     #predicted ancestral states
-    results = data.frame(tree=i,species=c(trees$node.label,trees$tip.label),states=c(hmm_model$states,hmm_model$tip.states))
-    
+    results = data.frame(species=c(trees$node.label,trees$tip.label),states=c(hmm_model$states,hmm_model$tip.states))
+    #replace numerical states with trait states
+    results$states = rate_mat$legend[match(results$states,names(rate_mat$legend))]
+    }
   }
-  #replace numerical states with trait states
-  rate_mat = getStateMat4Dat(dat)
-  results$states = rate_mat$legend[match(results$states,names(rate_mat$legend))]
+
   results$raw_state = dat[,trait_raw][match(results$species,dat[,species])]
   rownames(results)=NULL
   return(results)
@@ -429,22 +484,69 @@ hmm_pred_states<-function(trees,hmm_model,dat,species,trait_raw){
 #******************************************************************************************
 #HMM processing to transition dataset 
 #******************************************************************************************
+# trees = trees_no_outgroups[1:2]
+# hmm_model = multHMM_1
+# dat = hmm_multi
+# species = "tip"
+# trait_raw= "multi_cat"
+# node.states="marginal"
 
-hmm_pred_trans<-function(trees,hmm_model,dat,species,trait_raw){
+hmm_pred_trans<-function(trees,hmm_model,dat,species,trait_raw,node.states="marginal"){
   dat = as.data.frame(dat)
   rate_mat = getStateMat4Dat(dat)
   
-  #if trees$tip.label is null then must be list of trees
+#if trees$tip.label is null then must be list of trees
   if(is.null(trees$tip.label)) {
-    
-    #Multiple trees
+#Multiple trees  
     results <- vector("list", length(hmm_model))#use length(hmm_model) here and  length(trees) to ensure they are same length (will throw and error if not)
     
+#Multiple trees with probability of each state per node/species
+    if(node.states=="marginal"){
+    
     for(i in 1:length(trees)) {
+        states = round(rbind(hmm_model[[i]]$states,hmm_model[[i]]$tip.states),4)
+        pred_states = data.frame(tree=i,species=c(trees[[i]]$node.label,trees[[i]]$tip.label),states)
+        colnames(pred_states) = c("tree","species",rate_mat$legend)
+        
+        #Create column with most likely state
+        pred_states$states <- apply(pred_states[, -c(1:2)], 1, function(row) {
+          colnames(pred_states)[-c(1:2)][which.max(row)]
+        })
+        
+        #Create column with probability of most likely state 
+        pred_states$prob_state <- apply(pred_states[, 3:(length(pred_states)-1)], 1, function(row) {
+          max(row)
+        }) 
+        #make transition dataset
+        tree<-trees[[i]]
+        tree_df<-tidytree::as_tibble(tree)
+        tree_df <- data.frame(ancestor=tree_df$label[match(tree_df$parent,tree_df$node)],
+                              descendant=tree_df$label,
+                              label_no=tree_df$node,
+                              branch.length=tree_df$branch.length)
+        tree_df <- tree_df %>% dplyr::filter(ancestor != descendant) %>%
+          dplyr::mutate(anc_state=pred_states$states[match(ancestor,pred_states$species)],
+                        anc_prob=pred_states$prob_state[match(ancestor,pred_states$species)],
+                        des_state=pred_states$states[match(descendant,pred_states$species)],
+                        des_prob=pred_states$prob_state[match(descendant,pred_states$species)]) 
+        
+        #work out descendant nodes
+        trans <- tree_df %>% dplyr::arrange(ancestor) %>%
+          dplyr::mutate(des=rep(c("des1","des2"),length(unique(ancestor)))) %>% 
+          tidyr::pivot_wider(id_cols=c(ancestor,anc_state),names_from=c(des),values_from = c(des_state)) %>%
+          dplyr::mutate(des_comb=paste(des1,des2,sep=".")) 
+        
+        tree_df = data.frame(tree=i,tree_df)
+        results[[i]]<-tree_df 
+      }
+    results<-dplyr::bind_rows(results)
+
+#Multiple trees with most likely state per node/species  
+    } else {     
+    
+      for(i in 1:length(trees)) {
       pred_states<-data.frame(tree=i,species=c(trees[[i]]$node.label,trees[[i]]$tip.label),states=c(hmm_model[[i]]$states,hmm_model[[i]]$tip.states))
       pred_states$states = rate_mat$legend[match(pred_states$states,names(rate_mat$legend))]
-      
-      results[[i]]<-pred_states
       
       #make transition dataset
       tree<-trees[[i]]
@@ -467,12 +569,52 @@ hmm_pred_trans<-function(trees,hmm_model,dat,species,trait_raw){
       results[[i]]<-tree_df
     }
     results<-dplyr::bind_rows(results)
+    }
   } else  {
-    #Single tree, multiple maps
+    
+#Single tree with probability of each state per node/species
+    if(node.states=="marginal"){
+      #predicted ancestral states
+      states = round(rbind(hmm_model$states,hmm_model$tip.states),4)
+      pred_states = data.frame(species=c(trees$node.label,trees$tip.label),states)
+      colnames(pred_states) = c("species",rate_mat$legend)
+      
+      #Create column with most likely state
+      pred_states$states <- apply(pred_states[, -1], 1, function(row) {
+        colnames(pred_states)[-1][which.max(row)]
+      })
+      
+      #Create column with probability of most likely state 
+      pred_states$prob_state <- apply(pred_states[, 2:(length(pred_states)-1)], 1, function(row) {
+        max(row)
+      }) 
+      
+      #make transition dataset
+      tree_df<-tidytree::as_tibble(trees)
+      tree_df <- data.frame(ancestor=tree_df$label[match(tree_df$parent,tree_df$node)],
+                            descendant=tree_df$label,
+                            label_no=tree_df$node,
+                            branch.length=tree_df$branch.length)
+      tree_df <- tree_df %>% dplyr::filter(ancestor != descendant) %>%
+        dplyr::mutate(anc_state=pred_states$states[match(ancestor,pred_states$species)],
+                      anc_prob=pred_states$prob_state[match(ancestor,pred_states$species)],
+                      des_state=pred_states$states[match(descendant,pred_states$species)],
+                      des_prob=pred_states$prob_state[match(descendant,pred_states$species)]) 
+      
+      #work out descendant nodes
+      trans <- tree_df %>% dplyr::arrange(ancestor) %>%
+        dplyr::mutate(des=rep(c("des1","des2"),length(unique(ancestor)))) %>% 
+        tidyr::pivot_wider(id_cols=c(ancestor,anc_state),names_from=c(des),values_from = c(des_state)) %>%
+        dplyr::mutate(des_comb=paste(des1,des2,sep=".")) 
+      
+      results<-tree_df
+      
+    } else  { 
+      
+#Single tree with most likely state per node/species
     
     #predicted ancestral states
     pred_states = data.frame(species=c(trees$node.label,trees$tip.label),states=c(hmm_model$states,hmm_model$tip.states))
-    
     pred_states$states = rate_mat$legend[match(pred_states$states,names(rate_mat$legend))]
     
     #make transition dataset
@@ -493,7 +635,7 @@ hmm_pred_trans<-function(trees,hmm_model,dat,species,trait_raw){
     
     results<-tree_df
   }
-  
+}  
   #add in information on both descendents
   
   results$des_comb<-trans$des_comb[match(tree_df$ancestor,trans$ancestor)]

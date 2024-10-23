@@ -294,12 +294,6 @@ scm_pred_states<-function(trees,scm_model,dat,species,trait_raw){
 #******************************************************************************************
 #SCM processing to transition dataset 
 #******************************************************************************************
-trees=tree_no_outgroups
-scm_model=multSCM
-dat=dat_sp
-species="tip"
-trait_raw="multi_cat"
-
 scm_pred_trans<-function(trees,scm_model,dat,species,trait_raw){
   
   dat = as.data.frame(dat) # remove any formatting

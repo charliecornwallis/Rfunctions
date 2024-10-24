@@ -64,6 +64,9 @@ mcmcglmm_pred_states<-function(mr="No",trees,phy_name="animal",model,dat,trait1,
 #******************************************************************************************
 
 mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,model,dat,trait_raw,trait1,trait2=NULL,state1,state2,cutoff=0.5){
+  #remove formatting
+  dat = as.data.frame(dat)
+  
   #multiple responses or not
   trait_sub<-ifelse(mr=="No",paste(phy_name,".",sep=""),paste0("trait",trait1,".",paste(phy_name,".",sep="")))
   int<-ifelse(mr=="No","(Intercept)",paste0("trait",trait1))
@@ -513,12 +516,6 @@ hmm_pred_states<-function(trees,hmm_model,dat,species,trait_raw,node.states="mar
 #******************************************************************************************
 #HMM processing to transition dataset 
 #******************************************************************************************
-# trees = trees_no_outgroups[1:2]
-# hmm_model = multHMM_1
-# dat = hmm_multi
-# species = "tip"
-# trait_raw= "multi_cat"
-# node.states="marginal"
 
 hmm_pred_trans<-function(trees,hmm_model,dat,species,trait_raw,node.states="marginal"){
   

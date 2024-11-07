@@ -3,16 +3,16 @@
 #***************************************
 
 #Trouble shooting tools----
-# model=M4.2.1.1ns
-# responses=c("ob_host","ZavestanCarb", "ZavestanFat","ZavestanProtein","ZavestanEssAA", "ZavestanNonessAA","ZavestanA","ZavestanB","ZavestanE")
+# model=m
+# responses=NULL
 # dist_var=c(0)
-# fixed_names=c("Obligate %","Carbohydrates","Fat","Protein","EssAA","NonEssAA","Vitamin A","Vitamin B","Vitamin E")
+# fixed_names=NULL
 # Include_random = "yes"
-# variances=variances=c("traitob_host:traitob_host.animal","traitZavestanCarb:traitZavestanCarb.animal","traitZavestanProtein:traitZavestanProtein.animal","traitZavestanFat:traitZavestanFat.animal","traitZavestanEssAA:traitZavestanEssAA.animal","traitZavestanNonessAA:traitZavestanNonessAA.animal","traitZavestanA:traitZavestanA.animal","traitZavestanB:traitZavestanB.animal","traitZavestanE:traitZavestanE.animal","traitob_host:traitob_host.units","traitZavestanCarb:traitZavestanCarb.units","traitZavestanProtein:traitZavestanProtein.units","traitZavestanFat:traitZavestanFat.units","traitZavestanEssAA:traitZavestanEssAA.units","traitZavestanNonessAA:traitZavestanNonessAA.units","traitZavestanA:traitZavestanA.units","traitZavestanB:traitZavestanB.units","traitZavestanE:traitZavestanE.units")
-# covariances =c("traitZavestanCarb:traitob_host.animal","traitZavestanProtein:traitob_host.animal","traitZavestanFat:traitob_host.animal","traitZavestanEssAA:traitob_host.animal","traitZavestanNonessAA:traitob_host.animal","traitZavestanA:traitob_host.animal","traitZavestanB:traitob_host.animal","traitZavestanE:traitob_host.animal","traitZavestanCarb:traitob_host.units","traitZavestanProtein:traitob_host.units","traitZavestanFat:traitob_host.units","traitZavestanEssAA:traitob_host.units","traitZavestanNonessAA:traitob_host.units","traitZavestanA:traitob_host.units","traitZavestanB:traitob_host.units","traitZavestanE:traitob_host.units")
-# randomvar_names=c("Phylogeny Obligate","Phylogeny Carbs","Phylogeny Protein","Phylogeny Fat","Phylogeny EssAA","Phylogeny NonEssAA","Phylogeny Vit A", "Phylogeny Vit B","Phylogeny Vit E","Residual Obligate","Residual Carbs","Residual Protein","Residual Fat","Residual EssAA","Residual NonEssAA","Residual Vit A","Residual Vit B","Residual Vit E")
-# randomcovar_names =c("Phylogeny Carbs : Phylogeny Obligate","Phylogeny Protein : Phylogeny Obligate"," Phylogeny Fat : Phylogeny Obligate","Phylogeny EssAA : Phylogeny Obligate","Phylogeny NonEssAA : Phylogeny Obligate","Phylogeny Vit A : Phylogeny Obligate","Phylogeny Vit B : Phylogeny Obligate","Phylogeny Vit E : Phylogeny Obligate","Residual Carbs : Residual Obligate","Residual Protein : Residual Obligate"," Residual Fat : Residual Obligate","Residual EssAA : Residual Obligate","Residual NonEssAA : Residual Obligate","Residual Vit A : Residual Obligate","Residual Vit B : Residual Obligate","Residual Vit E : Residual Obligate")
-# cor_diffs = c("Noncoop Phylogeny temp within-year : Noncoop Phylogeny temp vs Pair Phylogeny temp within-year : Pair Phylogeny temp","Noncoop Phylogeny temp between-year : Noncoop Phylogeny temp vs Pair Phylogeny temp between-year : Pair Phylogeny temp")
+# variances=
+# covariances =
+# randomvar_names=
+# randomcovar_names =
+# cor_diffs = 
 # padding=3
 # ginv="animal"
 # fixed_diffinc="all"
@@ -50,7 +50,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=c(0),ginv="animal",S2v
   #Padding = space between tables when outputting multiple models to same sheet
   #dec_PM = number of decimals given for posterior mode and CIs of fixed and random effects
   #responses = specify response variables can take multiple values for multi response
-  #pvalues = exclusion of pMCMC values for fixed effects - "exclude", "include" or "c(?,?...)" giving list of which p values to exclude. Note pMCMC will still be calculated for fixed effect comparisons
+  #pvalues = exclusion of pMCMC values for fixed effects - "exclude" = exclude all, "include" = include all or index pvalues to be excluded e.g. "c(1,3)" removes 1st and 3rd, c(1:7) removes 1 to 7. Note pMCMC will still be calculated for fixed effect comparisons.
   #cor_diff = calculates differences between correlations. Should be specified in the same way as fixed_diffs e.g. c("cor1 vs cor2","cor1 vs cor3"...) 
   
   #Naming aid ----
@@ -109,11 +109,11 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=c(0),ginv="animal",S2v
   
   #P values using summary.MCMCglmm code
   #Pvalues = option to exclude 
-  if(pvalues == "include") {
+  if(any(pvalues == "include")) {
     fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
     fe1_p=round(as.numeric(fe1_p),3)
   } else  {
-    if(pvalues == "exclude") {
+    if(any(pvalues == "exclude")) {
       fe1_p=rep("-",length(fixed_names))
     } else  {
       fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2

@@ -440,13 +440,13 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #****************************************************
     ##Differences between fixed effects ----
     #****************************************************
-    #All differences between fixed effects
-    fe2<-pairwise.diffs(fixed_mod,nF=nF)
     
     ##fixed_diffinc ----
     if(any(fixed_diffinc_species == "none")) {
       fixed=fe1
     } else  {
+      #All differences between fixed effects: note this creates a matrix of all fixedeffects X all fixedeffects so will max out if there are many species.
+      fe2<-pairwise.diffs(fixed_mod,nF=nF)
       fixed=rbind(fe1,fe2)
       fixed = fixed %>% dplyr::filter(Fixed_Effects %in% c(fixed_names,fixed_diffinc_species) == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC)
     }

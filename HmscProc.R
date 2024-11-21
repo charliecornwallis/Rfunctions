@@ -584,9 +584,18 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
 
 
 #function for extracting df from xl workbook
-xl_2_df = function(xltab,sheet=NULL){
+xl_2_df_hmsc = function(xltab,sheet=NULL){
   df<-readWorkbook(xltab,sheet=sheet)
   colnames(df)<-gsub("[.]"," ",colnames(df))
+  rownames(df)<-NULL
+  return(df)
+}
+
+xl_2_df = function(xltab,sheet=NULL){
+  df<-readWorkbook(xltab,sheet=sheet,startRow=1)
+  colnames(df)<-df[1,]
+  colnames(df)<-gsub("[.]"," ",colnames(df))
+  df<-df %>% dplyr::filter(pMCMC != "" & dplyr::row_number() != 1)
   rownames(df)<-NULL
   return(df)
 }

@@ -26,7 +26,7 @@
 
 #Function ----
 
-MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=c(0),ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",cor_diffs=NULL)
+MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",cor_diffs=NULL)
 { 
   #Explanation of terms ----
   #model = MCMCglmm model
@@ -70,6 +70,12 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=c(0),ginv="animal",S2v
   } else {
   }
 
+  #Make sure distribution variances are specified
+  if (is.null(dist_var)) {
+    stop("please specify distribution variances e.g. distr=c(0) for a model with a single gaussian response, distr=c(0,0) for a model with two gaussian responses ect..")
+  } else {
+  }
+  
   #If response(s) not specified
   if (is.null(responses)) {
     

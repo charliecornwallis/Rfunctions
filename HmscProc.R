@@ -86,14 +86,14 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #P values using summary.MCMCglmm code
   nF=dim(fixed_mod)[2]
   #Pvalues = option to exclude 
-  if(pvalues == "include") {
-    fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
+  if(any(pvalues == "include")) {
+    fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
     fe1_p=round(as.numeric(fe1_p),3)
   } else  {
-    if(pvalues == "exclude") {
+    if(any(pvalues == "exclude")) {
       fe1_p=rep("-",length(fixed_names))
     } else  {
-      fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
+      fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
       fe1_p=round(as.numeric(fe1_p),3)
       fe1_p[pvalues]<-"-"
     }

@@ -485,10 +485,8 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
 
 #function for extracting df from xl workbook
 xl_2_df = function(xltab,sheet=NULL){
-  df<-readWorkbook(xltab,sheet=sheet,startRow=1)
-  colnames(df)<-df[1,]
+  df<-readWorkbook(xltab,sheet=sheet,startRow = 2)
   colnames(df)<-gsub("[.]"," ",colnames(df))
-  df<-df %>% dplyr::filter(pMCMC != "" & dplyr::row_number() != 1)
   rownames(df)<-NULL
   return(df)
 }

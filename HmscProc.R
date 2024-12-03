@@ -2,7 +2,7 @@
 #Function for processing Hmsc models#
 #***************************************
 
-HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",traits="exclude",pvalues = "include",VP_ave = "include",randomvar_names=NULL,Include_random = "yes",Include_species ="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",padding=4,dec_PM=2)
+HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",traits="exclude",pvalues = "include",VP_ave = "include",VPnames=NULL,randomvar_names=NULL,Include_random = "yes",Include_species ="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",padding=4,dec_PM=2)
 { 
   #Explanation ----
   #1. Takes an Hmsc model and combines estimates from multiple chains and output 2 excel sheets: 1) averages across species; 2) Per species values. If there are multiple species these are averaged per mcmc sample using rowMeans to produce posterior distribution of average effects.
@@ -30,6 +30,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   # Include_random = "yes" #include random effect estimates or not
   # randomvar_names=c("R1","R2","R3") #names of random effects - will take from model object if not specified
   # VP_ave = "include" #include variance partitioning for species averages
+  #VPnames = renaming of terms in Variance partitioning table
   # Include_species ="include" #should a separate sheet with species estimates be included?
   # fixed_diffinc_species="none" #differences between fixed effects to include for specific species e.g. fixed_diffinc_species=c(c("A: species1 vs B: species 1"))
   # VP_species = "include" #include variance partitioning for all species
@@ -280,6 +281,12 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     VP = suppressWarnings(computeVariancePartitioning(model)$vals)
     VP = data.frame(rowMeans(VP))
     VP = VP %>% mutate(across(everything(), ~round(., 4)*100))
+    
+    if(is.null(VPnames)) {
+    } else  {
+      rownames(VP) = VPnames
+    }
+    
     VP = data.frame("Variance Partitioning"=rownames(VP),"%"=VP[,1],check.names=FALSE)
     rownames(VP)<-NULL
   } else  {
@@ -584,18 +591,9 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
 
 
 #function for extracting df from xl workbook
-xl_2_df_hmsc = function(xltab,sheet=NULL){
-  df<-readWorkbook(xltab,sheet=sheet)
-  colnames(df)<-gsub("[.]"," ",colnames(df))
-  rownames(df)<-NULL
-  return(df)
-}
-
 xl_2_df = function(xltab,sheet=NULL){
-  df<-readWorkbook(xltab,sheet=sheet,startRow=1)
-  colnames(df)<-df[1,]
+  df<-readWorkbook(xltab,sheet=sheet,startRow = 2)
   colnames(df)<-gsub("[.]"," ",colnames(df))
-  df<-df %>% dplyr::filter(pMCMC != "" & dplyr::row_number() != 1)
   rownames(df)<-NULL
   return(df)
 }

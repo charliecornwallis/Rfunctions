@@ -293,7 +293,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   model_fit = as.data.frame(evaluateModelFit(model, predY=model_preds))
   
   #Round fit stats
-  model_fit = model_fit %>% mutate(across(everything(), ~round(., 2))) %>% dplyr::summarise(across(everything(), ~mean(., na.rm=T)))
+  model_fit = model_fit %>% dplyr::summarise(across(everything(), ~mean(., na.rm=T))) %>% mutate(across(everything(), ~round(., 2))) 
   
   #****************************************************
   #Phylo effects ----

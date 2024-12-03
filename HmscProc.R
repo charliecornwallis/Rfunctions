@@ -2,7 +2,7 @@
 #Function for processing Hmsc models#
 #***************************************
 
-HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",traits="exclude",pvalues = "include",VP_ave = "include",VPnames=NULL,randomvar_names=NULL,Include_random = "yes",Include_species ="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",padding=4,dec_PM=2)
+HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",pvalues = "include",traits="exclude",pvalues_traits= "exclude",VP_ave = "include",VPnames=NULL,randomvar_names=NULL,Include_random = "yes",Include_species ="exclude",pvalues_species="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",padding=4,dec_PM=2)
 { 
   #Explanation ----
   #1. Takes an Hmsc model and combines estimates from multiple chains and output 2 excel sheets: 1) averages across species; 2) Per species values. If there are multiple species these are averaged per mcmc sample using rowMeans to produce posterior distribution of average effects.
@@ -25,15 +25,17 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   # fixed_names=c("A","B","C","D") #names of fixed effects
   # fixed_diffinc=c("A vs B") #the differences between fixed effects for species averages to include e.g. fixed_diffinc=c("A vs B")
   # fixed_diff_diffs =NULL #compare differences of differences between fixed effects of species averages e.g. fixed_diff_diffs=c("A vs B - C vs D")
+  #pvalues = exclusion of pMCMC values for fixed effects - "exclude" = exclude all, "include" = include all or index pvalues to be excluded e.g. "c(1,3)" removes 1st and 3rd, c(1:7) removes 1 to 7. Note pMCMC will still be calculated for fixed effect comparisons.
   # traits="include" #include trait effects: this examines the influence of species traits on community composition (e.g. richness if presence / absence of each species)
-  # pvalues = "include" #include pvalues for comparisons or not
+  # pvalues_traits = as for pvalues, but in relation to traits. Default is exclude.
   # Include_random = "yes" #include random effect estimates or not
   # randomvar_names=c("R1","R2","R3") #names of random effects - will take from model object if not specified
   # VP_ave = "include" #include variance partitioning for species averages
-  #VPnames = renaming of terms in Variance partitioning table
+  # VPnames = renaming of terms in Variance partitioning table
   # Include_species ="include" #should a separate sheet with species estimates be included?
   # fixed_diffinc_species="none" #differences between fixed effects to include for specific species e.g. fixed_diffinc_species=c(c("A: species1 vs B: species 1"))
   # VP_species = "include" #include variance partitioning for all species
+  # pvalues_species = "exclude". Same as above but for species level estimates. Default is exclude.
   # Include_random_species = "yes" #include random effect variances for each species
   # random_names_species = NULL #names for random effects for each species
   # padding=4 #spacing in excel file
@@ -87,13 +89,13 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   nF=dim(fixed_mod)[2]
   #Pvalues = option to exclude 
   if(any(pvalues == "include")) {
-    fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
+    fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
     fe1_p=round(as.numeric(fe1_p),3)
   } else  {
     if(any(pvalues == "exclude")) {
       fe1_p=rep("-",length(fixed_names))
     } else  {
-      fe1_p=pmax(0.5/dim(model$Sol)[1], pmin(colSums(model$Sol[,1:nF, drop = FALSE] > 0)/dim(model$Sol)[1], 1 - colSums(model$Sol[, 1:nF, drop = FALSE] > 0)/dim(model$Sol)[1]))*2
+      fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
       fe1_p=round(as.numeric(fe1_p),3)
       fe1_p[pvalues]<-"-"
     }
@@ -219,16 +221,16 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #P values using summary.MCMCglmm code
   nG=dim(gamma)[2]
   #Pvalues = option to exclude 
-  if(pvalues == "include") {
+  if(any(pvalues_traits == "include")) {
     ge1_p=pmax(0.5/dim(gamma)[1], pmin(colSums(gamma[,1:nG, drop = FALSE] > 0)/dim(gamma)[1], 1 - colSums(gamma[, 1:nG, drop = FALSE] > 0)/dim(gamma)[1]))*2
     ge1_p=round(as.numeric(ge1_p),3)
   } else  {
-    if(pvalues == "exclude") {
+    if(any(pvalues_traits == "exclude")) {
       ge1_p=rep("-",length(gamma_names))
     } else  {
       ge1_p=pmax(0.5/dim(gamma)[1], pmin(colSums(gamma[,1:nG, drop = FALSE] > 0)/dim(gamma)[1], 1 - colSums(gamma[, 1:nG, drop = FALSE] > 0)/dim(gamma)[1]))*2
       ge1_p=round(as.numeric(ge1_p),3)
-      ge1_p[pvalues]<-"-"
+      ge1_p[pvalues_traits]<-"-"
     }
   }
   
@@ -428,16 +430,16 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #P values using summary.MCMCglmm code
     nG=dim(fixed_mod)[2]
     #Pvalues = option to exclude 
-    if(pvalues == "include") {
+    if(any(pvalues_species == "include")) {
       fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nG, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nG, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
       fe1_p=round(as.numeric(fe1_p),3)
     } else  {
-      if(pvalues == "exclude") {
+      if(any(pvalues_species == "exclude")) {
         fe1_p=rep("-",length(fixed_names))
       } else  {
         fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nG, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nG, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
         fe1_p=round(as.numeric(fe1_p),3)
-        fe1_p[pvalues]<-"-"
+        fe1_p[pvalues_species]<-"-"
       }
     }
     

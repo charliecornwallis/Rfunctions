@@ -2,18 +2,19 @@
 #Function for processing Hmsc models#
 #***************************************
 
-HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",pvalues = "include",traits="exclude",pvalues_traits= "exclude",VP_ave = "include",VPnames=NULL,randomvar_names=NULL,Include_random = "yes",Include_species ="exclude",pvalues_species="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",padding=4,dec_PM=2)
+HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",pvalues = "include",traits="exclude",pvalues_traits= "exclude",VP_ave = "include",VPnames=NULL,randomvar_names=NULL,Include_random = "yes",Include_species ="exclude",pvalues_species="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",community_comparisons = NULL,padding=4,dec_PM=2)
 { 
   #Explanation ----
   #1. Takes an Hmsc model and combines estimates from multiple chains and output 2 excel sheets: 1) averages across species; 2) Per species values. If there are multiple species these are averaged per mcmc sample using rowMeans to produce posterior distribution of average effects.
   #2. Estimates posterior modes and HPDintervals for effects
   #3. Calculates specified differences for fixed effects
-  #4. For models with trait data, combines runs and estimates trait effects
-  #5. Calculates average variance explained by random effects
-  #6. Calculates % variation of explained by fixed and random effects 
-  #7. For models with phylogenetic effects it outputs Rho
-  #8. Calculates fit statistics
-  #9. Output results to excel file
+  #4. If community_comparisons is specified (list of composition_metric,composition_variables, composition_comparisons (factors) and ngrid (# cut points for continuous variables default is 5) then it will calculate community compositon differences and test if they are different from randomised data (predictions from the model are randomised for each iteration).
+  #5. For models with trait data, combines runs and estimates trait effects
+  #6. Calculates average variance explained by random effects
+  #7. Calculates % variation of explained by fixed and random effects 
+  #8. For models with phylogenetic effects it outputs Rho
+  #9. Calculates fit statistics
+  #10. Output results to excel file
   
   #Example Terms
   # model=hm1 # model object
@@ -40,13 +41,15 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   # random_names_species = NULL #names for random effects for each species
   # padding=4 #spacing in excel file
   # dec_PM=2) #decimal places of estimates
-  
+  # community_comparisons = NULL # can take a list of lists e.g. "community_comparisons = list(ExFactor1 = list(composition_metric = "jaccard",composition_comp = c("A vs B", "B vs C")), Excontinuous1 = list(composition_metric = "jaccard",ngrid = 5))". Any "composition_metric" in vegdist function of vegan package (e.g."bray" or "jaccard") is allowed.
+  # composition_var = NULL #name of variable to compare composition metrics as it appear in the model formula
+
   #****************************************************
   #Section 1: averages per species ----
   #****************************************************
   
   #Load packages and naming
-  pacman::p_load(Hmsc,coda,stringdist,runjags,matrixStats,openxlsx)
+  pacman::p_load(Hmsc,coda,stringdist,runjags,matrixStats,openxlsx,vegan)
   
   #Convert model object
   post_model = convertToCodaObject(model)
@@ -316,7 +319,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   }
   
   #****************************************************
-  #Excel output: fixed and random effects ----
+  ##Excel output: fixed and random effects ----
   #****************************************************
   #Fixed effects
   fixedeff <- fixed[!grepl(" vs ",fixed$Fixed_Effects),]
@@ -324,6 +327,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #Fixed differences
   fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
   fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
+  
   #Random
   randomVar<-rand1
   
@@ -369,7 +373,6 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     } else  {
  }
   
-  
   #Bold pMCMC values less than 0.05
   bolding<-createStyle(textDecoration="bold")
   conditionalFormatting(workbook, sheet, cols=3, rows=1:10000, rule="<0.05", style = bolding)
@@ -399,7 +402,132 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   writeData(workbook, sheet, model_fit, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+dim(ge1)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+7,headerStyle = hs2)
   
   #****************************************************
-  #Section 2: per species values ----
+  #Section 2: Community comparisons ----
+  #****************************************************
+
+  if(is.null(community_comparisons)) {
+  #nothing to do done
+  } else  {
+  #Calculate community comparisons  
+  community = data.frame()
+  
+  for(i in 1:length(community_comparisons)){
+    composition_var = names(community_comparisons)[i]
+    composition_metric =community_comparisons[[i]]$composition_metric
+    
+    #setup predictions: need to setup differently for continuous and categorical variables
+    if(is.null(community_comparisons[[i]]$composition_comp)) {
+      #continuous effects
+      ngrid = ifelse(is.null(community_comparisons[[i]]$ngrid),5,community_comparisons[[i]]$ngrid) #number of points along the gradient 
+      
+      #Construct gradient for predictions
+      comp_1 = constructGradient(model, focalVariable = composition_var,      
+                                 non.focalVariables = 1,
+                                 ngrid = ngrid)
+      
+      #Predict values
+      comp_1_predictions = predict(model, 
+                                   XData=comp_1$XDataNew, 
+                                   studyDesign=comp_1$studyDesignNew, 
+                                   ranLevels=comp_1$rLNew)
+      #Setup comparisons
+      #composition_comp = expand_grid(as.factor(round(comp_1$XDataNew[,1],1)),as.factor(round(comp_1$XDataNew[,1],1)))
+      #colnames(composition_comp) = c("point1","point2")
+      #composition_comp = composition_comp %>% mutate(comparison = paste(point1,point2, sep = " vs "))
+      #composition_comp = as.character(composition_comp$comparison)
+      
+    } else  {
+      #categorical effects
+      composition_comp = community_comparisons[[i]]$composition_comp
+      #Construct gradient for predictions
+      comp_1 = constructGradient(model, focalVariable = composition_var,      
+                                 non.focalVariables = 1)
+      
+      #Predict values
+      comp_1_predictions = predict(model, 
+                                   XData=comp_1$XDataNew, 
+                                   studyDesign=comp_1$studyDesignNew, 
+                                   ranLevels=comp_1$rLNew)
+    }
+    
+    #Create a dataframe to write dissimilarity metric to
+    comp_res = data.frame()
+    comp_diff = data.frame()
+    
+    #for each iteration calculate dissimilarity and write to results to dataframe
+    for(j in 1:length(comp_1_predictions)){
+      dissim = as.data.frame(comp_1_predictions[j]) #real data
+      dissimR = as.data.frame(t(apply(dissim, 1, sample))) #randomised data
+      dissim_names = data.frame(code =rownames(comp_1$XDataNew),names=comp_1$XDataNew[,composition_var])
+      dissim_names = dissim_names %>% mutate_if(is.numeric, round, 1)
+      
+      real = melt(as.matrix(vegdist(dissim, method = composition_metric)), varnames = c("code1", "code2"), value.name = composition_metric) #dissimilarity measure on real data
+      ran = melt(as.matrix(vegdist(dissimR, method = composition_metric)), varnames = c("code1", "code2"), value.name = paste(composition_metric,"R",sep="")) #dissimilarity measure on randomised data
+      
+      tmp = left_join(real,ran, by = c("code1" = "code1", "code2" = "code2")) 
+      tmp = tmp %>% mutate(diff=tmp[,3]-tmp[,4], #calculate difference in dissimlarity metric between real and randomised data
+                           name_1=dissim_names$names[match(code1,dissim_names$code)], #change actual names
+                           name_2=dissim_names$names[match(code2,dissim_names$code)], #change actual names
+                           name_12=paste0(name_1," vs ",name_2)) %>% 
+        filter(name_1 != name_2) %>%
+        dplyr::select(-c(code1,code2,name_1,name_2)) 
+      
+      tmp1 = tmp %>% dplyr::select(name_12, composition_metric) %>% pivot_wider(names_from = name_12, values_from = composition_metric) #matrix of real values
+      tmp2 = tmp %>% dplyr::select(name_12, diff) %>% pivot_wider(names_from = name_12, values_from = diff) #matrix of differences between real and randomised values
+      
+      comp_res = rbind(comp_res,tmp1) #combine estimates from different iterations
+      comp_diff = rbind(comp_diff,tmp2) #combine difference estimates from different iterations
+    }
+    
+    #select specified comparisons if specified if not keep all
+    if(is.null(community_comparisons[[i]]$composition_comp)) {
+      comp_res = as.mcmc(comp_res)
+      comp_diff = as.mcmc(comp_diff) 
+    } else  {
+      comp_res = as.mcmc(comp_res[,composition_comp])
+      comp_diff = as.mcmc(comp_diff[,composition_comp]) 
+    } 
+    
+    #Pvalue of differences
+    nC = dim(comp_diff)[2]
+    cc1_p = pmax(0.5/dim(comp_diff)[1], pmin(colSums(comp_diff[,1:nC, drop = FALSE] > 0)/dim(comp_diff)[1], 1 - colSums(comp_diff[, 1:nC, drop = FALSE] > 0)/dim(comp_diff)[1]))*2
+    
+    #Format estimates
+    cc1_res=paste(round(posterior.mode(comp_res),dec_PM)," (",round(HPDinterval(comp_res)[,1],dec_PM), ", ",round(HPDinterval(comp_res)[,2],dec_PM),")",sep="")
+    cc1_diff=paste(round(posterior.mode(comp_diff),dec_PM+2)," (",round(HPDinterval(comp_diff)[,1],dec_PM), ", ",round(HPDinterval(comp_diff)[,2],dec_PM),")",sep="")
+    
+    cc1=data.frame("Variable"=composition_var,"Community Comparison"=colnames(comp_res),"Posterior Mode (CI)"=cc1_res, "Difference Posterior Mode (CI)"=cc1_diff, "pMCMC"=round(as.numeric(cc1_p),3),check.names=FALSE)
+    
+    #Combine results
+    community = rbind(community,cc1)
+  }
+  
+  #****************************************************
+  ##Excel output: community comparisons ----
+  #****************************************************
+  #Create new sheet 
+  sheet2 = paste(sheet,"Community_comparisons",sep="_")
+  start_row = 1
+  addWorksheet(workbook, sheet2)
+  
+  header=data.frame(col1=c(""),col2=c(""),col3=c(""),col4=c(""),col5=c(""))
+  colnames(header)<-c(paste(title,": Community comparisons",sep=" "),"","","","")
+  
+  #table title
+  writeData(workbook, sheet2, header, startCol = 1, startRow = start_row,headerStyle = hs1)
+  
+  #Community comparisons
+  writeData(workbook, sheet2, community, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
+  
+  #Bold pMCMC values less than 0.05
+  bolding<-createStyle(textDecoration="bold")
+  conditionalFormatting(workbook, sheet2, cols=5, rows=1:10000, rule="<0.05", style = bolding)
+  
+  }
+
+  
+  #****************************************************
+  #Section 3: per species values ----
   #****************************************************
   #should species estimates be included then proceed, otherwise return workbook
   if(Include_species == "include") {
@@ -528,7 +656,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     model_fit = data.frame(Species=model$spNames,model_fit)
     
     #****************************************************
-    #Excel output: fixed and random effects ----
+    ##Excel output: fixed and random effects ----
     #****************************************************
     #Fixed effects
     fixedeff <- fixed[!grepl(" vs ",fixed$Fixed_Effects),]
@@ -541,48 +669,48 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     randomVar<-rand1
     
     #Create new sheet 
-    sheet2 = paste(sheet,"species",sep="_")
+    sheet3 = paste(sheet,"species",sep="_")
     start_row = 1
-    addWorksheet(workbook, sheet2)
+    addWorksheet(workbook, sheet3)
     
     #
     header=data.frame(col1=c(""),col2=c(""),col3=c(""),col4=c(""),col5=c(""),col6=c(""),col7=c(""),col8=c(""),col9=c(""))
-    colnames(header)<-c(paste(title,"species estimates",sep=" "),"","","","","","","","")
+    colnames(header)<-c(paste(title,": species estimates",sep=" "),"","","","","","","","")
     
     #table title
-    writeData(workbook, sheet2, header, startCol = 1, startRow = start_row,headerStyle = hs1)
+    writeData(workbook, sheet3, header, startCol = 1, startRow = start_row,headerStyle = hs1)
 
     #Fixed effects
-    writeData(workbook, sheet2, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
+    writeData(workbook, sheet3, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
     row_nums = start_row+dim(header)[1]+dim(fixedeff)[1]+2
     
     #Remove column headings if deleting fixed effects as it will be assessing higher order interactions where column names are not needed
     if(any(fixed_diffinc_species == "none")) { #Do not write fixed_diffinc_species if "none"
       } else  {
-      writeData(workbook, sheet2, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
+      writeData(workbook, sheet3, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
       row_nums = row_nums + dim(fixeddiff)[1] + 2
         }
     
     #Bold pMCMC values less than 0.05
     bolding<-createStyle(textDecoration="bold")
-    conditionalFormatting(workbook, sheet2, cols=3, rows=1:10000, rule="<0.05", style = bolding)
+    conditionalFormatting(workbook, sheet3, cols=3, rows=1:10000, rule="<0.05", style = bolding)
     
     #Random effects: variances
     #Should they be outputted or not
     if(Include_random_species == "yes") {
-      writeData(workbook, sheet2, randomVar, startCol = 1, startRow = row_nums,headerStyle = hs2)
+      writeData(workbook, sheet3, randomVar, startCol = 1, startRow = row_nums,headerStyle = hs2)
       row_nums = row_nums + dim(randomVar)[1]+2
     } else  {
     }
     
     if(VP_species == "include") {
-      writeData(workbook, sheet2, VP, startCol = 1, startRow = row_nums,headerStyle = hs2)
+      writeData(workbook, sheet3, VP, startCol = 1, startRow = row_nums,headerStyle = hs2)
       row_nums = row_nums + dim(VP)[1]+2
       } else  {
     }
     
-    writeData(workbook, sheet2, "Fit statistics", startCol = 1, startRow = row_nums,headerStyle = hs2)
-    writeData(workbook, sheet2, model_fit, startCol = 1, startRow = row_nums+2,headerStyle = hs2)
+    writeData(workbook, sheet3, "Fit statistics", startCol = 1, startRow = row_nums,headerStyle = hs2)
+    writeData(workbook, sheet3, model_fit, startCol = 1, startRow = row_nums+2,headerStyle = hs2)
     return(workbook)
     
     #If species estimate != "include" then just returns a workbook with estimates averaged across species

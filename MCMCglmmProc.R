@@ -277,7 +277,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
   } else  {
   
   #If only residual variance  
-  if(dim(model$VCV)[2]==1) {
+  if(dim(as.matrix(model$VCV))[2]==1) {
     
     rand1=paste(round(posterior.mode(model$VCV),dec_PM)," (",round(HPDinterval(model$VCV)[,1],dec_PM), ", ",round(HPDinterval(model$VCV)[,2],dec_PM),")",sep="")
     randomVar<-data.frame("Random Effects"="Residual","Posterior Mode (CI)"=c(rand1),"I2 % (CI)"=100, check.names=FALSE)

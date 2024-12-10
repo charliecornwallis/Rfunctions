@@ -41,8 +41,9 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   # random_names_species = NULL #names for random effects for each species
   # padding=4 #spacing in excel file
   # dec_PM=2) #decimal places of estimates
-  # community_comparisons = NULL # can take a list of lists e.g. "community_comparisons = list(ExFactor1 = list(composition_metric = "jaccard",composition_comp = c("A vs B", "B vs C")), Excontinuous1 = list(composition_metric = "jaccard",ngrid = 5))". Any "composition_metric" in vegdist function of vegan package (e.g."bray" or "jaccard") is allowed.
-  # composition_var = NULL #name of variable to compare composition metrics as it appear in the model formula
+  # community_comparisons = NULL # can take a list of lists e.g. "community_comparisons = list(Factor1 = list(composition_metric = "jaccard",comp_names = c("A","B","C","D"),composition_comp = c("A vs B", "B vs C")), Continuous1 = list(composition_metric = "jaccard",comp_names = "A",ngrid = 5))". Any "composition_metric" in vegdist function of vegan package (e.g."bray" or "jaccard") is allowed.
+  # composition_var #Factor1, Continuous1 above = name of variable to compare composition metrics as it appears in the model formula 
+  # comp_names #the names of the variable as you want to appear in the table. For factors in must include all levels even if a level is not included in the comparisons (e.g. "D" above).
 
   #****************************************************
   #Section 1: averages per species ----
@@ -413,7 +414,8 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   
   for(i in 1:length(community_comparisons)){
     composition_var = names(community_comparisons)[i]
-    composition_metric =community_comparisons[[i]]$composition_metric
+    composition_metric = community_comparisons[[i]]$composition_metric
+    comp_names = community_comparisons[[i]]$comp_names
     
     #setup predictions: need to setup differently for continuous and categorical variables
     if(is.null(community_comparisons[[i]]$composition_comp)) {
@@ -430,6 +432,11 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
                                    XData=comp_1$XDataNew, 
                                    studyDesign=comp_1$studyDesignNew, 
                                    ranLevels=comp_1$rLNew)
+      
+      #rename
+      colnames(comp_1$XDataNew)[1] = comp_names[1]
+      composition_var = comp_names[1]
+      
       #Setup comparisons
       #composition_comp = expand_grid(as.factor(round(comp_1$XDataNew[,1],1)),as.factor(round(comp_1$XDataNew[,1],1)))
       #colnames(composition_comp) = c("point1","point2")
@@ -448,6 +455,9 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
                                    XData=comp_1$XDataNew, 
                                    studyDesign=comp_1$studyDesignNew, 
                                    ranLevels=comp_1$rLNew)
+      #rename
+      comp_1$XDataNew[,1] = comp_names
+      comp_1$XDataNew[,1] = as.factor(comp_1$XDataNew[,1])
     }
     
     #Create a dataframe to write dissimilarity metric to
@@ -478,6 +488,10 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
       comp_res = rbind(comp_res,tmp1) #combine estimates from different iterations
       comp_diff = rbind(comp_diff,tmp2) #combine difference estimates from different iterations
     }
+    
+    #remove rows where differences between communities weren't possible to calculate
+    comp_res = comp_res[complete.cases(comp_res),] 
+    comp_diff = comp_diff[complete.cases(comp_diff),] 
     
     #select specified comparisons if specified if not keep all
     if(is.null(community_comparisons[[i]]$composition_comp)) {

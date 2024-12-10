@@ -26,7 +26,7 @@
 
 #Function ----
 
-MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "yes",padding=4,dec_PM=2,pvalues="include",cor_diffs=NULL)
+MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "no",padding=4,dec_PM=2,pvalues="include",cor_diffs=NULL)
 { 
   #Explanation of terms ----
   #model = MCMCglmm model
@@ -94,11 +94,6 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
   #Remove unwanted effects
   #Remove mev from random effect
   model$VCV<-model$VCV[, colnames(model$VCV) !="sqrt(mev):sqrt(mev).meta"]
-  
-  #Rename phylogeny or pedigree term (ginv=) to animal
-  colnames(model$VCV) <- sub(ginv, "animal", colnames(model$VCV))
-  variances <- sub(ginv, "animal", variances)
-
   
   #Rename model fixed effects
   if(is.null(fixed_names)) {
@@ -224,21 +219,90 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
     fixed = rbind(fixed,diffs.diffs)
   }
   
+  #Fixed effects
+  fixedeff <- fixed[!grepl(" vs ",fixed$Fixed_Effects),]
+  fixedeff<-data.frame("Fixed Effects"=fixedeff$Fixed_Effects,"Posterior Mode (CI)"=fixedeff$Estimates,"pMCMC"=fixedeff$pMCMC,check.names=FALSE)
+  #Fixed differences
+  fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
+  fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
+  
+  #****************************************************
+  #Excel output: fixed effects ----
+  #****************************************************
+  #Create excel workbook if not specified
+  if(is.null(workbook)) {
+    workbook<- createWorkbook()
+  } else  {workbook
+  }
+  #Create excel sheet if not specified
+  if(create_sheet == "yes") {
+    addWorksheet(workbook, sheet)
+  } else  {sheet=sheet
+  }
+  #Calculate start row
+  if(is.null(start_row)) {
+    start_row=1
+  } else  {start_row=start_row
+  }
+  
+  #Table headers
+  hs1 <- createStyle(fgFill = "white", halign = "LEFT", textDecoration = "bold",border = "TopBottom")
+  hs2 <- createStyle(halign = "LEFT",border = "TopBottom",textDecoration = "bold")
+  #table title
+  header=data.frame(col1=c(""),col2=c(""),col3=c(""))
+  colnames(header)<-c(title,"","")
+  writeData(workbook, sheet, header, startCol = 1, startRow = start_row,headerStyle = hs1)
+  
+  #Fixed effects
+  writeData(workbook, sheet, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
+  row_nums = start_row+dim(header)[1] + dim(fixedeff)[1]+1
+  
+  if(any(fixed_diffinc == "none")) { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
+  } else  {
+    writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
+    row_nums = row_nums + dim(fixeddiff)[1]+1
+  }
+  
+  #Bold pMCMC values less than 0.05
+  bolding<-createStyle(textDecoration="bold")
+  conditionalFormatting(workbook, sheet, cols=3, rows=1:10000, rule="<0.05", style = bolding)
+
   #****************************************************
   #Random effects ----
   #****************************************************
+  #Random effects: variances
+  #Should they be estimated or not?
+  if(Include_random == "no") {
+  #No random effects or none to be estimated
+  } else  {
+  
+  #If only residual variance  
+  if(dim(model$VCV)[2]==1) {
+    
+    rand1=paste(round(posterior.mode(model$VCV),dec_PM)," (",round(HPDinterval(model$VCV)[,1],dec_PM), ", ",round(HPDinterval(model$VCV)[,2],dec_PM),")",sep="")
+    randomVar<-data.frame("Random Effects"="Residual","Posterior Mode (CI)"=c(rand1),"I2 % (CI)"=100, check.names=FALSE)
+    
+    } else  {  
+  
+  #Rename phylogeny or pedigree term (ginv=) to animal
+  colnames(model$VCV) <- sub(ginv, "animal", colnames(model$VCV))
+  variances <- sub(ginv, "animal", variances)
+  
   #if variances are not specified make them the same as those in the model
   if(is.null(variances)) {
-    variances<-colnames(model$VCV)
+    
+    #Multi-response models
     if(length(responses)>1){
       var_ids<-seq(from=1,to=length(responses)^2,by=length(responses)+1)#indices of variances
       for(i in 1:length(model$Random$nfl)+1){ #The indices corresponding to each response variable
         var_ids<-c(var_ids,var_ids+max(var_ids))
       }
       variances<-variances[var_ids]#Pick out variances
-    } else  {variances<-colnames(model$VCV)#if single response model then all random effects assumed to be variances. Might not always be the case (e.g. for random regression ) in which case variances and covariance need to be specified
+    } else  {
+      #if single response model then all random effects assumed to be variances. Might not always be the case (e.g. for random regression ) in which case variances and covariance need to be specified
+      variances<-colnames(model$VCV)
     } 
-  } else  {variances<-variances
+  } else  {
   }
   
   ##Separate out variance and covariance terms ----
@@ -246,7 +310,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
   
   #rename random effects if specified
   if(is.null(randomvar_names)) {
-    colnames(var_terms)<- colnames(var_terms)
+    colnames(var_terms)<- variances
     randomvar_names<-variances
   } else  {colnames(var_terms)<-randomvar_names
   }
@@ -333,78 +397,34 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
   
   #Summaries
   icc1=paste(round(colMeans(icc_all),dec_PM)," (",round(HPDinterval(icc_all)[,1],dec_PM), ", ",round(HPDinterval(icc_all)[,2],dec_PM),")",sep="")
-  
-  #****************************************************
-  #Excel output: fixed and random effects ----
-  #****************************************************
-  #Fixed effects
-  fixedeff <- fixed[!grepl(" vs ",fixed$Fixed_Effects),]
-  fixedeff<-data.frame("Fixed Effects"=fixedeff$Fixed_Effects,"Posterior Mode (CI)"=fixedeff$Estimates,"pMCMC"=fixedeff$pMCMC,check.names=FALSE)
-  #Fixed differences
-  fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
-  fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
-  #Random
+
+  #Format Random effects output
   if(sum(S2var) ==0){
     randomVar<-data.frame("Random Effects"=c(colnames(var_terms)),"Posterior Mode (CI)"=c(rand1),"I2 % (CI)"=c(icc1), check.names=FALSE)
   } else  {
     randomVar<-data.frame("Random Effects"=c(colnames(var_terms),names(icc_S2var)),"Posterior Mode (CI)"=c(rand1,round(S2var,dec_PM)),"I2 % (CI)"=c(icc1,icc_S2var), check.names=FALSE)
   }
   
-  #Create excel workbook if not specified
-  if(is.null(workbook)) {
-    workbook<- createWorkbook()
-  } else  {workbook
-  }
-  #Create excel sheet if not specified
-  if(create_sheet == "yes") {
-    addWorksheet(workbook, sheet)
-  } else  {sheet=sheet
-  }
-  #Calculate start row
-  if(is.null(start_row)) {
-    start_row=1
-  } else  {start_row=start_row
-  }
+}
   
-  #Table headers
-  hs1 <- createStyle(fgFill = "white", halign = "LEFT", textDecoration = "bold",border = "TopBottom")
-  hs2 <- createStyle(halign = "LEFT",border = "TopBottom",textDecoration = "bold")
-  #table title
-  header=data.frame(col1=c(""),col2=c(""),col3=c(""))
-  colnames(header)<-c(title,"","")
-  writeData(workbook, sheet, header, startCol = 1, startRow = start_row,headerStyle = hs1)
-  
-  #Fixed effects
-  #Fixed effects
-  writeData(workbook, sheet, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
-  row_nums = start_row+dim(header)[1] + dim(fixedeff)[1]+1
-  
-  if(any(fixed_diffinc == "none")) { #Do not write fixeddiff dataframe if fixed_diffinc == "none"
-  } else  {
-    writeData(workbook, sheet, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
-    row_nums = row_nums + dim(fixeddiff)[1]+1
-  }
-  
-  #Bold pMCMC values less than 0.05
-  bolding<-createStyle(textDecoration="bold")
-  conditionalFormatting(workbook, sheet, cols=3, rows=1:10000, rule="<0.05", style = bolding)
-  
-  #Random effects: variances
-  #Should they be outputted or not
-  if(Include_random == "yes") {
-    writeData(workbook, sheet, randomVar, startCol = 1, startRow = row_nums,headerStyle = hs2)
-    row_nums = row_nums + dim(randomVar)[1]+2
-  } else  {
-  }
 
+  #****************************************************
+  #Excel output: random effects ----
+  #****************************************************
+  writeData(workbook, sheet, randomVar, startCol = 1, startRow = row_nums,headerStyle = hs2)
+  row_nums = row_nums + dim(randomVar)[1]+2
+  
+  }
+  
   #****************************************************
   #Correlations ----
   #****************************************************
-  #Covariance output - correlations
-  
+  if(Include_random == "no") {
+    #If no random effects are estimated then skip correlation estimation
+  } else  {
+    
   #If no covariances skip this part
   if(is.null(randomcovar_names)) {
-    return(workbook)
   } else  {
     #Covariance identification if not specified
     if(is.null(covariances)) {
@@ -475,7 +495,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
     conditionalFormatting(workbook, sheet, cols=3, rows=row_nums+4:10000, rule="<0.05", style = bolding)
     row_nums = row_nums + dim(corr_select)[1]+2
   }
-  
+}  
   #Some final formatting ----
   for(i in 1:length(sheets(workbook))){
     setColWidths(workbook, sheet = i, cols = 1:20, widths = "auto")
@@ -483,6 +503,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
   return(workbook)
 }
 
+#******************************************************
 #function for extracting df from xl workbook
 xl_2_df = function(xltab,sheet=NULL){
   df<-readWorkbook(xltab,sheet=sheet,startRow = 2)
@@ -498,6 +519,7 @@ xl_2_df2 = function(xltab,sheet=NULL){
   return(df)
 }
 
+#******************************************************
 #function for df to Rmd table
 md_table = function(df){
   pacman::p_load(kableExtra)
@@ -524,6 +546,7 @@ md_table = function(df){
     row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") %>%
     column_spec(column=3, bold =rows_bold)}
 
+#******************************************************
 md_table2 = function(df){
   pacman::p_load(kableExtra)
   kbl(df, align = "l", digits = 3) %>%

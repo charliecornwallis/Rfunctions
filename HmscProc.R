@@ -382,6 +382,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     writeData(workbook, sheet, randomVar, startCol = 1, startRow = row_nums,headerStyle = hs2)
     row_nums = row_nums + dim(randomVar)[1]+2
   } else  {
+    randomVar = data.frame()
   }
   
   if(VP_ave == "include") {

@@ -245,7 +245,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #Random effects ----
   #****************************************************
   #matrix for placing estimates into
-  random_mod = matrix(nrow = model$samples*length(model$repList), ncol =length(post_model$Omega))
+  random_mod = matrix(nrow = model$samples*length(post_model$Omega[[1]]), ncol =length(post_model$Omega))
   
   for(i in 1:length(post_model$Omega)){
     #combine chains 
@@ -606,7 +606,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #Random effects ----
     #****************************************************
     #matrix for placing estimates into
-    random_mod = matrix(nrow = model$samples*length(model$repList))
+    random_mod = matrix(nrow = model$samples*length(post_model$Omega[[1]]))
     
     for(i in 1:length(post_model$Omega)){
       #combine chains 

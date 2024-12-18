@@ -275,8 +275,9 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     }
     
     #Summary of variance components
-    rand1 = paste(round(posterior.mode(random_mod),dec_PM)," (",round(HPDinterval(random_mod)[,1],dec_PM), ", ",round(HPDinterval(random_mod)[,2],dec_PM),")",sep="")
-    rand1 = data.frame("Random Effects"=colnames(random_mod),"Posterior Mode (CI)"=rand1,"-"="",check.names=FALSE)
+    randomVar = paste(round(posterior.mode(random_mod),dec_PM)," (",round(HPDinterval(random_mod)[,1],dec_PM), ", ",round(HPDinterval(random_mod)[,2],dec_PM),")",sep="")
+    randomVar = data.frame("Random Effects"=colnames(random_mod),"Posterior Mode (CI)"=randomVar,"-"="",check.names=FALSE)
+    
   } else  {
   }
   
@@ -328,9 +329,6 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #Fixed differences
   fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
   fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
-  
-  #Random
-  randomVar<-rand1
   
   #Create excel workbook if not specified
   if(is.null(workbook)) {
@@ -605,6 +603,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #****************************************************
     #Random effects ----
     #****************************************************
+    if(Include_random_species == "yes") {
     #matrix for placing estimates into
     random_mod = matrix(nrow = model$samples*length(post_model$Omega[[1]]))
     
@@ -638,11 +637,10 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
       colnames(random_mod)<-random_names_species
     }
     
-    
-    if(Include_random_species == "yes") {
       #Summary of variance components
-      rand1 = paste(round(posterior.mode(random_mod),dec_PM)," (",round(HPDinterval(random_mod)[,1],dec_PM), ", ",round(HPDinterval(random_mod)[,2],dec_PM),")",sep="")
-      rand1 = data.frame("Random Effects"=colnames(random_mod),"Posterior Mode (CI)"=rand1,"-"="",check.names=FALSE)
+      randomVarspp = paste(round(posterior.mode(random_mod),dec_PM)," (",round(HPDinterval(random_mod)[,1],dec_PM), ", ",round(HPDinterval(random_mod)[,2],dec_PM),")",sep="")
+      randomVarspp = data.frame("Random Effects"=colnames(random_mod),"Posterior Mode (CI)"=randomVarspp,"-"="",check.names=FALSE)
+      
     } else  {
     }
     
@@ -679,9 +677,6 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
     fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
     
-    #Random
-    randomVar<-rand1
-    
     #Create new sheet 
     sheet3 = paste(sheet,"species",sep="_")
     start_row = 1
@@ -712,8 +707,8 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #Random effects: variances
     #Should they be outputted or not
     if(Include_random_species == "yes") {
-      writeData(workbook, sheet3, randomVar, startCol = 1, startRow = row_nums,headerStyle = hs2)
-      row_nums = row_nums + dim(randomVar)[1]+2
+      writeData(workbook, sheet3, randomVarspp, startCol = 1, startRow = row_nums,headerStyle = hs2)
+      row_nums = row_nums + dim(randomVarspp)[1]+2
     } else  {
     }
     

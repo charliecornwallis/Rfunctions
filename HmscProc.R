@@ -244,6 +244,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #****************************************************
   #Random effects ----
   #****************************************************
+  if(Include_random == "yes") {
   #matrix for placing estimates into
   random_mod = matrix(nrow = model$samples*length(post_model$Omega[[1]]), ncol =length(post_model$Omega))
   
@@ -273,7 +274,6 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     } else  {colnames(random_mod)<-randomvar_names
     }
     
-    if(Include_random == "yes") {
     #Summary of variance components
     rand1 = paste(round(posterior.mode(random_mod),dec_PM)," (",round(HPDinterval(random_mod)[,1],dec_PM), ", ",round(HPDinterval(random_mod)[,2],dec_PM),")",sep="")
     rand1 = data.frame("Random Effects"=colnames(random_mod),"Posterior Mode (CI)"=rand1,"-"="",check.names=FALSE)

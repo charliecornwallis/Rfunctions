@@ -28,7 +28,7 @@
 #Function for sampling of across trees using MCMCglmm models#
 #***************************************
 
-MCMCglmmTrees<-function(prior, treetoburn,data, mev=0,trees,tiplabel,fixed,random,residual,Gnumber,Rnumber,Geffects,Reffects,family="gaussian",samples=1000,nitts_tree,thins_tree,burns_tree,pr=FALSE){
+MCMCglmmTrees<-function(prior, treetoburn,data, mev=0,trees,tiplabel,fixed,random,residual,Gnumber,Rnumber,Geffects,Reffects,family="gaussian",samples=1000,nitts_tree,thins_tree,burns_tree,pr=FALSE,trunc = F){
 # Explanation
 # prior #model prior
 # treetoburn #number of trees to discard before saving iterations
@@ -55,14 +55,13 @@ MCMCglmmTrees<-function(prior, treetoburn,data, mev=0,trees,tiplabel,fixed,rando
   
   model<-MCMCglmm(fixed=fixed, random=random, rcov = residual,
                   ginverse=list(tiplabel=tree1),family =family, data = data,prior=prior, 
-                  nitt=samples, burnin=0, thin=1,pr=pr,verbose = F,pl=T)
+                  nitt=samples, burnin=0, thin=1,pr=pr,verbose = F,pl=T,trunc = F)
   modeltmp<-model
   
-  #2. Run model on each tree. Estimates of last tree provide start values for next tree. Use first 500 trees as a burnin. ----
+  #2. Run model on each tree. Estimates of last tree provide start values for next tree. Use first treestoburn trees as a burnin. ----
   trees<-trees[1:(samples+treetoburn)]#make sure list of trees is not longer than burnin + samples to be saved
   
   for(i in 1:length(trees)){
-    i=1
     tree<-trees[[i]]
     invtree<-inverseA(tree)$Ainv
     
@@ -74,35 +73,36 @@ MCMCglmmTrees<-function(prior, treetoburn,data, mev=0,trees,tiplabel,fixed,rando
     G_start=list()
     for(j in 1:Gnumber){
       k=j-1
-      a=ifelse(j==1,1,sum(Geffects[1:k]))
+      a=ifelse(j==1,1,1+sum(Geffects[1:k]))
       b=sum(Geffects[1:j])
-      G=list(modeltmp$VCV[1,a:b])
+      G=ifelse(Geffects[j]>1,
+               list(matrix(ncol=sqrt(Geffects[j]),nrow=sqrt(Geffects[j]),modeltmp$VCV[1,a:b])),
+               list(modeltmp$VCV[1,a:b]))
       names(G)<-paste("G",j,sep="")
       G_start=c(G_start,G)
     }
-    names(G_start)<-"G"
     
     #**R design ----
     R_start=list()
     for(j in 1:Rnumber){
-      j=1
+      glength=length(unlist(G_start))
       k=j-1
-      glength=length(G_start$G)
-      a=ifelse(j==1,glength+1,(glength+sum(Reffects[1:k])))
+      a=ifelse(j==1,glength+1,(glength+1+sum(Reffects[1:k])))
       b=glength+sum(Reffects[1:j])
-      R=list(modeltmp$VCV[1,a:b])
+      R=ifelse(Reffects[j]>1,
+               list(matrix(ncol=sqrt(Reffects[j]),nrow=sqrt(Reffects[j]),modeltmp$VCV[1,a:b])),
+               list(modeltmp$VCV[1,a:b]))
       names(R)<-paste("R",j,sep="")
       R_start=c(R_start,R)
     }
-    names(R_start)<-"R"
     
     #combine
-    start=list(liab_start,G_start,R_start)
+    start=list(Liab=liab_start,G=G_start,R=R_start)
     
     #3. Sample across trees ----
     modeltmp<-MCMCglmm(fixed=fixed, random=random, rcov = residual,
                        ginverse=list(tiplabel=invtree),family =family, data = data,prior=prior, 
-                       nitt=nitts_tree, thin=thins_tree,burnin=burns_tree, start=start, pr=pr,verbose = F,pl=T)
+                       nitt=nitts_tree, thin=thins_tree,burnin=burns_tree, start=start, pr=pr,verbose = F,pl=T,trunc = F)
     #saving after tree burnin
     if(i>treetoburn){
       model$VCV[i-treetoburn,]<-modeltmp$VCV[1,]

@@ -2,7 +2,24 @@
 #MCMCglmm processing to extract values from models for ancestral nodes - can take list of trees (first part of function) or single trees (second part of function)
 #******************************************************************************************
 
-mcmcglmm_pred_states<-function(mr="No",trees,phy_name="animal",model,dat,trait1,trait2=NULL,binomial="No",state1=NULL,state2=NULL,cutoff=0.5){
+mcmcglmm_pred_states<-function(mr="No",trees,phy_name="animal",model,dat,trait1,trait2=NULL,link="identity",state1=NULL,state2=NULL,cutoff=0.5){
+  #remove formatting
+  dat = as.data.frame(dat)
+  
+  #link function
+  link_fun <- function(link) {
+    if (link == "identity") {
+      return(function(x) { 1 * x })
+    } else if (link == "logit") {
+      return(function(x) { boot::inv.logit(x) })
+    } else if (link == "probit") {
+      return(function(x) { VGAM::probitlink(x, inverse = T) })
+    } else {
+      stop("Invalid link function specified. Choose 'identity', 'logit', or 'probit'.")
+    }
+  }
+  inv.link = link_fun(link)
+  
   #multiple responses or not
   trait_sub<-ifelse(mr=="No",paste(phy_name,".",sep=""),paste0("trait",trait1,".",paste(phy_name,".",sep="")))
   int<-ifelse(mr=="No","(Intercept)",paste0("trait",trait1))
@@ -21,8 +38,8 @@ mcmcglmm_pred_states<-function(mr="No",trees,phy_name="animal",model,dat,trait1,
     for(i in 1:length(trees)) {
       #extract model estimates
       tree<-trees[[i]]
-      if(binomial == "Yes") {
-        pred_states<-data.frame(tree=i,species=c(tree$node.label,tree$tip.label),estimate=boot::inv.logit(model$Sol[i,grepl(trait1,colnames(model$Sol))]))
+      if(link != "identity") {
+        pred_states<-data.frame(tree=i,species=c(tree$node.label,tree$tip.label),estimate=inv.link(model$Sol[i,grepl(trait1,colnames(model$Sol))]))
         pred_states$pred_state<-ifelse(pred_states$estimate>cutoff,state2,ifelse(pred_states$estimate<(1-cutoff),state1,"Unknown"))
       } else  {
         pred_states<-data.frame(tree=i,species=c(tree$node.label,tree$tip.label),estimate=model$Sol[i,grepl(trait1,colnames(model$Sol))])
@@ -33,39 +50,53 @@ mcmcglmm_pred_states<-function(mr="No",trees,phy_name="animal",model,dat,trait1,
     results<-dplyr::bind_rows(results)
     rownames(results)<-NULL
     return(results)
-    } else  {
+  } else  {
     
     #Function for single tree
     #Check tree has node labels
-      if(is.null(trees$node.label)) {
-        trees<-makeNodeLabel(trees)
-      } else  {trees<-trees
-      }
-      tree<-trees
-      if(binomial == "Yes") {
-        mod_est=data.frame(species=gsub(trait_sub,"",colnames(model$Sol)[grep(trait1,colnames(model$Sol))]),estimate=boot::inv.logit(posterior.mode(model$Sol[,grepl(trait1,colnames(model$Sol))])))
-        mod_est$species[mod_est$species == int]<-"Node1"
-        pred_states<-data.frame(species=c(tree$node.label,tree$tip.label))
-        pred_states$estimate<-mod_est$estimate[match(pred_states$species,mod_est$species)]
-        pred_states$pred_state<-ifelse(pred_states$estimate>cutoff,state2,ifelse(pred_states$estimate<(1-cutoff),state1,"Unknown"))
-      } else  {
-        pred_states=data.frame(species=gsub(trait_sub,"",colnames(model$Sol)[grep(trait1,colnames(model$Sol))]),estimate=posterior.mode(model$Sol[,grepl(trait1,colnames(model$Sol))]))
-        pred_states$species[pred_states$species == int]<-"Node1"
-        pred_states$estimate<-ifelse(pred_states$species == "Node1",pred_states$estimate,pred_states$estimate + pred_states$estimate[pred_states$species == "Node1"])
-      }
+    if(is.null(trees$node.label)) {
+      trees<-makeNodeLabel(trees)
+    } else  {trees<-trees
+    }
+    tree<-trees
+    if(link != "identity") {
+      mod_est=data.frame(species=gsub(trait_sub,"",colnames(model$Sol)[grep(trait1,colnames(model$Sol))]),estimate=inv.link(posterior.mode(model$Sol[,grepl(trait1,colnames(model$Sol))])))
+      mod_est$species[mod_est$species == int]<-"Node1"
+      pred_states<-data.frame(species=c(tree$node.label,tree$tip.label))
+      pred_states$estimate<-mod_est$estimate[match(pred_states$species,mod_est$species)]
+      pred_states$pred_state<-ifelse(pred_states$estimate>cutoff,state2,ifelse(pred_states$estimate<(1-cutoff),state1,"Unknown"))
+    } else  {
+      pred_states=data.frame(species=gsub(trait_sub,"",colnames(model$Sol)[grep(trait1,colnames(model$Sol))]),estimate=posterior.mode(model$Sol[,grepl(trait1,colnames(model$Sol))]))
+      pred_states$species[pred_states$species == int]<-"Node1"
+      pred_states$estimate<-ifelse(pred_states$species == "Node1",pred_states$estimate,pred_states$estimate + pred_states$estimate[pred_states$species == "Node1"])
+    }
     rownames(pred_states)<-NULL
     return(pred_states)
-    }
+  }
 }      
- 
+
 
 #******************************************************************************************
 #MCMCglmm processing to transition dataset - can take list of trees (first part of function) or single trees (second part of function)
 #******************************************************************************************
 
-mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,model,dat,trait_raw,trait1,trait2=NULL,state1,state2,cutoff=0.5){
+mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,link="logit",model,dat,trait_raw,trait1,trait2=NULL,state1,state2,cutoff=0.5){
   #remove formatting
   dat = as.data.frame(dat)
+  
+  #link function
+  link_fun <- function(link) {
+    if (link == "identity") {
+      return(function(x) { 1 * x })
+    } else if (link == "logit") {
+      return(function(x) { boot::inv.logit(x) })
+    } else if (link == "probit") {
+      return(function(x) { VGAM::probitlink(x, inverse = T) })
+    } else {
+      stop("Invalid link function specified. Choose 'identity', 'logit', or 'probit'.")
+    }
+  }
+  inv.link = link_fun(link)
   
   #multiple responses or not
   trait_sub<-ifelse(mr=="No",paste(phy_name,".",sep=""),paste0("trait",trait1,".",paste(phy_name,".",sep="")))
@@ -82,8 +113,8 @@ mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,model,dat,trait_raw,tra
     for(i in 1:length(trees)) {
       #extract model estimates
       tree<-trees[[i]]
-        pred_states<-data.frame(tree=i,species=c(tree$node.label,tree$tip.label),prob=boot::inv.logit(model$Sol[i,grepl(trait1,colnames(model$Sol))]))
-        pred_states$pred_state<-ifelse(pred_states$prob>cutoff,state2,ifelse(pred_states$prob<(1-cutoff),state1,"Unknown"))
+      pred_states<-data.frame(tree=i,species=c(tree$node.label,tree$tip.label),prob=boot::inv.link(model$Sol[i,grepl(trait1,colnames(model$Sol))]))
+      pred_states$pred_state<-ifelse(pred_states$prob>cutoff,state2,ifelse(pred_states$prob<(1-cutoff),state1,"Unknown"))
       
       #make transition dataset
       tree_df<-tidytree::as_tibble(tree)
@@ -93,9 +124,9 @@ mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,model,dat,trait_raw,tra
                             branch.length=tree_df$branch.length)
       tree_df <- tree_df %>% dplyr::filter(ancestor != descendant) %>%
         dplyr::mutate(anc_prob=pred_states$prob[match(ancestor,pred_states$species)],
-               anc_state=pred_states$pred_state[match(ancestor,pred_states$species)],
-               des_prob=pred_states$prob[match(descendant,pred_states$species)],
-               des_state=pred_states$pred_state[match(descendant,pred_states$species)]) 
+                      anc_state=pred_states$pred_state[match(ancestor,pred_states$species)],
+                      des_prob=pred_states$prob[match(descendant,pred_states$species)],
+                      des_state=pred_states$pred_state[match(descendant,pred_states$species)]) 
       
       #work out descendant nodes
       trans <- tree_df %>% dplyr::arrange(ancestor) %>%
@@ -127,7 +158,7 @@ mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,model,dat,trait_raw,tra
       #Construct transitions
       trans <- trans %>% dplyr::mutate(des_comb=paste(anc_state,des12_state,sep="."))%>%
         dplyr::mutate(des_comb=ifelse(anc_state == state2 & des12_state == "Both",comb8,des_comb),
-               des_comb=ifelse(anc_state == state1 & des12_state == "Both",comb7,des_comb)) %>%
+                      des_comb=ifelse(anc_state == state1 & des12_state == "Both",comb7,des_comb)) %>%
         dplyr::mutate(des_comb=ifelse(grepl("Unknown",des_comb),"Unknown",des_comb))
       
       tree_df$des_comb<-trans$des_comb[match(tree_df$ancestor,trans$ancestor)]
@@ -140,7 +171,7 @@ mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,model,dat,trait_raw,tra
     results$des_comb<-ifelse(grepl("NA",results$des_comb),"NA",results$des_comb)
     return(results)
     
-    } else  {
+  } else  {
     
     #Function for single tree
     
@@ -149,13 +180,13 @@ mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,model,dat,trait_raw,tra
       trees<-makeNodeLabel(trees)
     } else  {trees<-trees
     }
-      tree<-trees
-      mod_est=data.frame(species=gsub(trait_sub,"",colnames(model$Sol)),prob=boot::inv.logit(posterior.mode(model$Sol[,grepl(trait1,colnames(model$Sol))])))
-      mod_est$species[mod_est$species == int]<-"Node1"
-      pred_states<-data.frame(species=c(tree$node.label,tree$tip.label))
-      pred_states$prob<-mod_est$prob[match(pred_states$species,mod_est$species)]
-      pred_states$pred_state<-ifelse(pred_states$prob>cutoff,state2,ifelse(pred_states$prob<(1-cutoff),state1,"Unknown"))
-      
+    tree<-trees
+    mod_est=data.frame(species=gsub(trait_sub,"",colnames(model$Sol)),prob=boot::inv.link(posterior.mode(model$Sol[,grepl(trait1,colnames(model$Sol))])))
+    mod_est$species[mod_est$species == int]<-"Node1"
+    pred_states<-data.frame(species=c(tree$node.label,tree$tip.label))
+    pred_states$prob<-mod_est$prob[match(pred_states$species,mod_est$species)]
+    pred_states$pred_state<-ifelse(pred_states$prob>cutoff,state2,ifelse(pred_states$prob<(1-cutoff),state1,"Unknown"))
+    
     #add raw trait data
     pred_states$raw_state<-dat[,trait_raw][match(pred_states$species,dat[,phy_name])]
     
@@ -167,11 +198,11 @@ mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,model,dat,trait_raw,tra
                        branch.length=tree_df$branch.length)
     data <- data %>% dplyr::filter(ancestor != descendant) %>%
       dplyr::mutate(anc_prob=pred_states$prob[match(ancestor,pred_states$species)],
-             anc_state=pred_states$pred_state[match(ancestor,pred_states$species)],
-             des_prob=pred_states$prob[match(descendant,pred_states$species)],
-             des_state=pred_states$pred_state[match(descendant,pred_states$species)]) 
-    data$anc_prob[data$ancestor == "Node1"]<-boot::inv.logit(mean(model$Sol[,"(Intercept)"]))
-    data$anc_state[data$ancestor == "Node1"]<-ifelse(boot::inv.logit(mean(model$Sol[,"(Intercept)"]))>cutoff,state2,state1)#Root = intercept
+                    anc_state=pred_states$pred_state[match(ancestor,pred_states$species)],
+                    des_prob=pred_states$prob[match(descendant,pred_states$species)],
+                    des_state=pred_states$pred_state[match(descendant,pred_states$species)]) 
+    data$anc_prob[data$ancestor == "Node1"]<-boot::inv.link(mean(model$Sol[,"(Intercept)"]))
+    data$anc_state[data$ancestor == "Node1"]<-ifelse(boot::inv.link(mean(model$Sol[,"(Intercept)"]))>cutoff,state2,state1)#Root = intercept
     
     #Work out descendent states of each ancestor
     trans <- data %>% dplyr::arrange(ancestor) %>%
@@ -203,7 +234,7 @@ mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,model,dat,trait_raw,tra
     #Construct transitions
     trans <- trans %>% dplyr::mutate(des_comb=paste(anc_state,des12_state,sep="."))%>%
       dplyr::mutate(des_comb=ifelse(anc_state == state2 & des12_state == "Both",comb8,des_comb),
-             des_comb=ifelse(anc_state == state1 & des12_state == "Both",comb7,des_comb)) %>%
+                    des_comb=ifelse(anc_state == state1 & des12_state == "Both",comb7,des_comb)) %>%
       dplyr::mutate(des_comb=ifelse(grepl("Unknown",des_comb),"Unknown",des_comb))
     
     data$des_comb<-trans$des_comb[match(data$ancestor,trans$ancestor)]
@@ -211,9 +242,8 @@ mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,model,dat,trait_raw,tra
     rownames(data)<-NULL
     data$des_comb<-ifelse(grepl("NA",data$des_comb),"NA",data$des_comb)
     return(data)
-    }
+  }
 }  
-
 
 #******************************************************************************************
 #SCM predicted ancestral states

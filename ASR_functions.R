@@ -113,7 +113,7 @@ mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,link="logit",model,dat,
     for(i in 1:length(trees)) {
       #extract model estimates
       tree<-trees[[i]]
-      pred_states<-data.frame(tree=i,species=c(tree$node.label,tree$tip.label),prob=boot::inv.link(model$Sol[i,grepl(trait1,colnames(model$Sol))]))
+      pred_states<-data.frame(tree=i,species=c(tree$node.label,tree$tip.label),prob=inv.link(model$Sol[i,grepl(trait1,colnames(model$Sol))]))
       pred_states$pred_state<-ifelse(pred_states$prob>cutoff,state2,ifelse(pred_states$prob<(1-cutoff),state1,"Unknown"))
       
       #make transition dataset
@@ -181,7 +181,7 @@ mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,link="logit",model,dat,
     } else  {trees<-trees
     }
     tree<-trees
-    mod_est=data.frame(species=gsub(trait_sub,"",colnames(model$Sol)),prob=boot::inv.link(posterior.mode(model$Sol[,grepl(trait1,colnames(model$Sol))])))
+    mod_est=data.frame(species=gsub(trait_sub,"",colnames(model$Sol)),prob=inv.link(posterior.mode(model$Sol[,grepl(trait1,colnames(model$Sol))])))
     mod_est$species[mod_est$species == int]<-"Node1"
     pred_states<-data.frame(species=c(tree$node.label,tree$tip.label))
     pred_states$prob<-mod_est$prob[match(pred_states$species,mod_est$species)]
@@ -201,8 +201,8 @@ mcmcglmm_trans<-function(mr="No",phy_name="animal",trees,link="logit",model,dat,
                     anc_state=pred_states$pred_state[match(ancestor,pred_states$species)],
                     des_prob=pred_states$prob[match(descendant,pred_states$species)],
                     des_state=pred_states$pred_state[match(descendant,pred_states$species)]) 
-    data$anc_prob[data$ancestor == "Node1"]<-boot::inv.link(mean(model$Sol[,"(Intercept)"]))
-    data$anc_state[data$ancestor == "Node1"]<-ifelse(boot::inv.link(mean(model$Sol[,"(Intercept)"]))>cutoff,state2,state1)#Root = intercept
+    data$anc_prob[data$ancestor == "Node1"]<-inv.link(mean(model$Sol[,"(Intercept)"]))
+    data$anc_state[data$ancestor == "Node1"]<-ifelse(inv.link(mean(model$Sol[,"(Intercept)"]))>cutoff,state2,state1)#Root = intercept
     
     #Work out descendent states of each ancestor
     trans <- data %>% dplyr::arrange(ancestor) %>%

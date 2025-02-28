@@ -592,3 +592,39 @@ md <- function(data,stats=FALSE) {
       set_table_properties(width=1,layout = "autofit",opts_html = list(scroll = list(height = "1000px", freeze_first_column = TRUE)),opts_word = list(keep_with_next = TRUE))
   }
 }
+
+
+#******************************************************
+#function for df to Rmd table
+md_table = function(df){
+  pacman::p_load(kableExtra)
+  if(length(grep("Random",df$`Fixed Effects`))>0 & length(grep("Correlations",df$`Fixed Effects`))>0) {
+    Fixed<-df[1:(as.numeric(row.names(df[grepl("Random",df$`Fixed Effects`),]))-1),]
+    Random<-df[as.numeric(row.names(df[grepl("Random",df$`Fixed Effects`),])):(as.numeric(row.names(df[grepl("Correlations",df$`Fixed Effects`),]))-1),]
+    Corrs<-df[as.numeric(row.names(df[grepl("Correlations",df$`Fixed Effects`),])):dim(df)[1],]
+    rows_bold<-c(ifelse(Fixed$pMCMC<0.05,T,F),ifelse(Random$pMCMC<0.05,F,F),ifelse(Corrs$pMCMC<0.05,T,F))
+  } else  {if(length(grep("Random",df$`Fixed Effects`))>0) {
+    Fixed<-df[1:(as.numeric(row.names(df[grepl("Random",df$`Fixed Effects`),]))-1),]
+    Random<-df[as.numeric(row.names(df[grepl("Random",df$`Fixed Effects`),])):dim(df)[1],]
+    rows_bold<-c(ifelse(Fixed$pMCMC<0.05,T,F),ifelse(Random$pMCMC<0.05,F,F))
+  } else  {
+    Fixed<-df
+    rows_bold<-ifelse(Fixed$pMCMC<0.05,T,F)}}  kbl(df, align = "l", digits = 3) %>%    
+    kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11) %>%    
+    row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
+    row_spec(grep("^Fixed Effect Comparisons",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
+    row_spec(grep("^Random",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
+    row_spec(grep("^Correlations",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
+    row_spec(grep("^Correlation comparions",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") %>%    
+    row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") %>%    
+    column_spec(column=3, bold =rows_bold)}
+
+#******************************************************
+md_table2 = function(df){pacman::p_load(kableExtra)  
+    kbl(df, align = "l", digits = 3) %>%    
+    kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11) %>%    
+    row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
+    row_spec(grep("^Random",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
+    row_spec(grep("^Correlations",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
+    row_spec(grep("^Correlation comparions",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
+    row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px")}

@@ -609,7 +609,8 @@ md_table = function(df){
     rows_bold<-c(ifelse(Fixed$pMCMC<0.05,T,F),ifelse(Random$pMCMC<0.05,F,F))
   } else  {
     Fixed<-df
-    rows_bold<-ifelse(Fixed$pMCMC<0.05,T,F)}}  kbl(df, align = "l", digits = 3) %>%    
+    rows_bold<-ifelse(Fixed$pMCMC<0.05,T,F)}}  
+    kbl(df, align = "l", digits = 3) %>%    
     kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11) %>%    
     row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
     row_spec(grep("^Fixed Effect Comparisons",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    

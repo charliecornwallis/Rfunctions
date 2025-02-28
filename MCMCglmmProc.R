@@ -535,39 +535,60 @@ rename_xlsheets <- function(wb,name) {
 
 #******************************************************
 #function for df to Rmd table
-md_table = function(df){
-  pacman::p_load(kableExtra)
-  if(length(grep("Random",df$`Fixed Effects`))>0 & length(grep("Correlations",df$`Fixed Effects`))>0) {
-    Fixed<-df[1:(as.numeric(row.names(df[grepl("Random",df$`Fixed Effects`),]))-1),]
-    Random<-df[as.numeric(row.names(df[grepl("Random",df$`Fixed Effects`),])):(as.numeric(row.names(df[grepl("Correlations",df$`Fixed Effects`),]))-1),]
-    Corrs<-df[as.numeric(row.names(df[grepl("Correlations",df$`Fixed Effects`),])):dim(df)[1],]
-    rows_bold<-c(ifelse(Fixed$pMCMC<0.05,T,F),ifelse(Random$pMCMC<0.05,F,F),ifelse(Corrs$pMCMC<0.05,T,F))
-  } else  {if(length(grep("Random",df$`Fixed Effects`))>0) {
-    Fixed<-df[1:(as.numeric(row.names(df[grepl("Random",df$`Fixed Effects`),]))-1),]
-    Random<-df[as.numeric(row.names(df[grepl("Random",df$`Fixed Effects`),])):dim(df)[1],]
-    rows_bold<-c(ifelse(Fixed$pMCMC<0.05,T,F),ifelse(Random$pMCMC<0.05,F,F))
-  } else  {
-    Fixed<-df
-    rows_bold<-ifelse(Fixed$pMCMC<0.05,T,F)}
+md <- function(data,stats=FALSE) {
+  #Output if html format
+  if (knitr::is_html_output()) {
+    pacman::p_load(kableExtra)
+    #Output if presenting mixed model stats: bolding significant values and highlighting headings
+    if(stats == TRUE){
+      if(length(grep("Random",data$`Fixed Effects`))>0 & length(grep("Correlations",data$`Fixed Effects`))>0) {
+        Fixed<-data[1:(as.numeric(row.names(data[grepl("Random",data$`Fixed Effects`),]))-1),]
+        Random<-data[as.numeric(row.names(data[grepl("Random",data$`Fixed Effects`),])):(as.numeric(row.names(data[grepl("Correlations",data$`Fixed Effects`),]))-1),]
+        Corrs<-data[as.numeric(row.names(data[grepl("Correlations",data$`Fixed Effects`),])):dim(data)[1],]
+        rows_bold<-c(ifelse(Fixed$pMCMC<0.05,T,F),ifelse(Random$pMCMC<0.05,F,F),ifelse(Corrs$pMCMC<0.05,T,F))
+      } else  {if(length(grep("Random",data$`Fixed Effects`))>0) {
+        Fixed<-data[1:(as.numeric(row.names(data[grepl("Random",data$`Fixed Effects`),]))-1),]
+        Random<-data[as.numeric(row.names(data[grepl("Random",data$`Fixed Effects`),])):dim(data)[1],]
+        rows_bold<-c(ifelse(Fixed$pMCMC<0.05,T,F),ifelse(Random$pMCMC<0.05,F,F))
+      } else  {
+        Fixed<-data
+        rows_bold<-ifelse(Fixed$pMCMC<0.05,T,F)
+      }
+      }
+      kbl(data, align = "l", digits = 3) |>
+        kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11) |>
+        row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid")|>
+        row_spec(grep("^Fixed Effect Comparisons",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")|>
+        row_spec(grep("^Random",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")|>
+        row_spec(grep("^Correlations",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")|>
+        row_spec(grep("^Correlation comparions",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |>
+        row_spec(nrow(data), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") |>
+        column_spec(column=3, bold =rows_bold) |> 
+        row_spec(1:nrow(data), extra_css = "height: 1em; white-space: nowrap;") |> 
+        column_spec(1:ncol(data), width = "auto")
+    }
+    #Output if not mixed model output
+    else  {  
+      kbl(data,align = "l")  |> 
+        kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11,fixed_thead = T) |>
+        row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid") |>
+        row_spec(nrow(data), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") |>
+        row_spec(1:nrow(data), extra_css = "height: 1em; white-space: nowrap;") |> 
+        column_spec(1:ncol(data), width = "auto") |> 
+        scroll_box(width = "1000px", height = "1000px")
+    }
   }
-  kbl(df, align = "l", digits = 3) %>%
-    kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11) %>%
-    row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
-    row_spec(grep("^Fixed Effect Comparisons",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
-    row_spec(grep("^Random",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
-    row_spec(grep("^Correlations",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
-    row_spec(grep("^Correlation comparions",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") %>%
-    row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") %>%
-    column_spec(column=3, bold =rows_bold)}
-
-#******************************************************
-md_table2 = function(df){
-  pacman::p_load(kableExtra)
-  kbl(df, align = "l", digits = 3) %>%
-    kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11) %>%
-    row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
-    row_spec(grep("^Random",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
-    row_spec(grep("^Correlations",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
-    row_spec(grep("^Correlation comparions",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
-    row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px")}
-
+  #Ouput for other formats
+  else  {
+    flextable(data) |>
+      theme_vanilla() |>
+      fontsize(size = 10, part = "header") |>
+      fontsize(size = 8, part = "body") |>
+      bold(part = "header") |>
+      bg(part = "header", bg = "#E7E5E5") |>
+      border(border.top = fp_border(color = "black", width = 1), part = "header") |>
+      border(border.bottom = fp_border(color = "black", width = 1), part = "header") |>
+      border(border.bottom = fp_border(color = "black", width = 1), i = nrow(data)) |>
+      set_table_properties(width=1,layout = "autofit",opts_html = list(scroll = list(height = "1000px", freeze_first_column = TRUE)),opts_word = list(keep_with_next = TRUE))
+  }
+}

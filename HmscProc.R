@@ -8,7 +8,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #1. Takes an Hmsc model and combines estimates from multiple chains and output 2 excel sheets: 1) averages across species; 2) Per species values. If there are multiple species these are averaged per mcmc sample using rowMeans to produce posterior distribution of average effects.
   #2. Estimates posterior modes and HPDintervals for effects
   #3. Calculates specified differences for fixed effects
-  #4. If community_comparisons is specified (list of composition_metric,composition_variables, composition_comparisons (factors) and ngrid (# cut points for continuous variables default is 5) then it will calculate community compositon differences and test if they are different from randomised data (predictions from the model are randomised for each iteration).
+  #4. If community_comparisons is specified (list of composition_metric,composition_variables, composition_comparisons (factors) and ngrid (# cut points for continuous variables default is 5) then it will calculate community compositon differences and test if they are different from randomised data (random data is simulted using a Poisson distribution with Lambda = mean of predicted values).
   #5. For models with trait data, combines runs and estimates trait effects
   #6. Calculates average variance explained by random effects
   #7. Calculates % variation of explained by fixed and random effects 
@@ -445,7 +445,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     } else  {
       #categorical effects
       composition_comp = community_comparisons[[i]]$composition_comp
-      #Construct gradient for predictions
+      #Construct predictions
       comp_1 = constructGradient(model, focalVariable = composition_var,      
                                  non.focalVariables = 1)
       
@@ -465,8 +465,16 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     
     #for each iteration calculate dissimilarity and write to results to dataframe
     for(j in 1:length(comp_1_predictions)){
-      dissim = as.data.frame(comp_1_predictions[j]) #real data
-      dissimR = as.data.frame(t(apply(dissim, 1, sample))) #randomised data
+      dissim = as.data.frame(comp_1_predictions[j]) #model predictions 
+      
+      #randomised data: sample from poisson distribution with mean = mean of predicted values. If jaccard then set max to 1 (e.g. present)
+      if (composition_metric == "jaccard") {
+        dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
+        dissimR = pmin(dissimR, 1)
+      } else {
+        dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
+      }
+                        
       dissim_names = data.frame(code =rownames(comp_1$XDataNew),names=comp_1$XDataNew[,composition_var])
       dissim_names = dissim_names %>% mutate_if(is.numeric, round, 1)
       

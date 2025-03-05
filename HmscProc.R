@@ -2,13 +2,13 @@
 #Function for processing Hmsc models#
 #***************************************
 
-HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",pvalues = "include",traits="exclude",pvalues_traits= "exclude",VP_ave = "include",VPnames=NULL,randomvar_names=NULL,Include_random = "yes",Include_species ="exclude",pvalues_species="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",community_comparisons = NULL,padding=4,dec_PM=2)
+HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",pvalues = "include",traits="exclude",pvalues_traits= "exclude",VP_ave = "include",VPnames=NULL,randomvar_names=NULL,Include_random = "yes",Include_species ="exclude",pvalues_species="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",community_comparisons = NULL,response_logged = FALSE,padding=4,dec_PM=2)
 { 
   #Explanation ----
   #1. Takes an Hmsc model and combines estimates from multiple chains and output 2 excel sheets: 1) averages across species; 2) Per species values. If there are multiple species these are averaged per mcmc sample using rowMeans to produce posterior distribution of average effects.
   #2. Estimates posterior modes and HPDintervals for effects
   #3. Calculates specified differences for fixed effects
-  #4. If community_comparisons is specified (list of composition_metric,composition_variables, composition_comparisons (factors) and ngrid (# cut points for continuous variables default is 5) then it will calculate community compositon differences and test if they are different from randomised data (random data is simulted using a Poisson distribution with Lambda = mean of predicted values).
+  #4. If community_comparisons is specified (list of composition_metric,composition_variables, composition_comparisons (factors) and ngrid (# cut points for continuous variables default is 5) then it will calculate community compositon differences and test if they are different from randomised data (random data is created by randomising predicted values across variables). response_logged=TRUE is used if log counts are modelled.
   #5. For models with trait data, combines runs and estimates trait effects
   #6. Calculates average variance explained by random effects
   #7. Calculates % variation of explained by fixed and random effects 
@@ -466,10 +466,15 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #for each iteration calculate dissimilarity and write to results to dataframe
     for(j in 1:length(comp_1_predictions)){
       dissim = as.data.frame(comp_1_predictions[j]) #model predictions 
-      
       #Randomise data within each column of the data
-      dissimR <- as.matrix(apply(dissim, 2, function(col) sample(col)))
-      
+      if (response_logged == TRUE) {
+              #Backtransform if response is logged
+              dissim = exp(as.matrix(dissim))
+              dissimR = as.matrix(apply(dissim, 2, function(col) sample(col)))
+              } else {
+              dissimR = as.matrix(apply(dissim, 2, function(col) sample(col)))
+              }
+
       #Code below creates random expectation by sampling from a Poisson distribution. This is downgraded as it is better to randomise actual data
       #randomised data: sample from poisson distribution with mean = mean of predicted values. If jaccard then set max to 1 (e.g. present)
       # if (composition_metric == "jaccard") {

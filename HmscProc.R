@@ -467,8 +467,10 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     for(j in 1:length(comp_1_predictions)){
       dissim = as.data.frame(comp_1_predictions[j]) #model predictions 
       
-      dissimR = as.data.frame(t(apply(dissim, 1, sample))) #randomised data
+      #Randomise data within each column of the data
+      dissimR <- as.matrix(apply(dissim, 2, function(col) sample(col)))
       
+      #Code below creates random expectation by sampling from a Poisson distribution. This is downgraded as it is better to randomise actual data
       #randomised data: sample from poisson distribution with mean = mean of predicted values. If jaccard then set max to 1 (e.g. present)
       # if (composition_metric == "jaccard") {
       #   dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))

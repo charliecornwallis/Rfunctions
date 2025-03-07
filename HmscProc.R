@@ -468,18 +468,19 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
       dissim = as.data.frame(comp_1_predictions[j]) #model predictions 
       #Randomise data within each column of the data
       if (response_logged == TRUE) {
+              #Predict for each sample, randomise and calculate dissimilarity
               #Backtransform if response is logged
               dissim = exp(as.matrix(dissim))
-              dissimR = as.matrix(apply(dissim, 2, function(col) sample(col)))
+              dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
               } else {
-              dissimR = as.matrix(apply(dissim, 2, function(col) sample(col)))
+              dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
               }
 
       #Code below creates random expectation by sampling from a Poisson distribution. This is downgraded as it is better to randomise actual data
       #randomised data: sample from poisson distribution with mean = mean of predicted values. If jaccard then set max to 1 (e.g. present)
       # if (composition_metric == "jaccard") {
-      #   dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
-      #   dissimR = pmin(dissimR, 1)
+        # dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
+        # dissimR = pmin(dissimR, 1)
       # } else {
       #       if (response_logged == TRUE) {
       #       #Backtransform if response is logged

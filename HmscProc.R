@@ -466,32 +466,45 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #for each iteration calculate dissimilarity and write to results to dataframe
     for(j in 1:length(comp_1_predictions)){
       dissim = as.data.frame(comp_1_predictions[j]) #model predictions 
-      #Randomise data within each column of the data
-      if (response_logged == TRUE) {
-              #Predict for each sample, randomise and calculate dissimilarity
-              #Backtransform if response is logged
-              dissim = exp(as.matrix(dissim))
-              dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
-              } else {
-              dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
+      
+      #Code below creates random expectation by sampling from a Poisson distribution with mean = to prevalence of each taxa. If jaccard then set max to 1 (e.g. present)
+      tax_means = as.data.frame(model$Y) 
+      tax_means = colMeans(tax_means) #mean prevalence/abundance of each taxa
+      
+      if (composition_metric == "jaccard") {
+      #dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
+      dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
+      for (k in 1:ncol(dissim)) {
+          dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
+        }
+      dissimR = pmin(dissimR, 1)
+      } else {
+            if (response_logged == TRUE) {
+            #Backtransform if response is logged
+            dissim = exp(as.matrix(dissim))
+            dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
+            for (k in 1:ncol(dissim)) {
+              dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
+            }
+            dissimR = log(dissimR+1)
+            } else {
+              dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
+              for (k in 1:ncol(dissim)) {
+                dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
               }
-
-      #Code below creates random expectation by sampling from a Poisson distribution. This is downgraded as it is better to randomise actual data
-      #randomised data: sample from poisson distribution with mean = mean of predicted values. If jaccard then set max to 1 (e.g. present)
-      # if (composition_metric == "jaccard") {
-        # dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
-        # dissimR = pmin(dissimR, 1)
+            }
+      }
+      
+      #Randomise data within each column of the data. Not used as doesn't randomise data for taxa within invariant abundances
+      # if (response_logged == TRUE) {
+      #   #Predict for each sample, randomise and calculate dissimilarity
+      #   #Backtransform if response is logged
+      #   dissim = exp(as.matrix(dissim))
+      #   dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
       # } else {
-      #       if (response_logged == TRUE) {
-      #       #Backtransform if response is logged
-      #       dissim = exp(as.matrix(dissim))
-      #       dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
-      #       dissimR = log(dissimR+1)
-      #       } else {
-      #       dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))  
-      #       }
+      #   dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
       # }
-                        
+      
       dissim_names = data.frame(code =rownames(comp_1$XDataNew),names=comp_1$XDataNew[,composition_var])
       dissim_names = dissim_names %>% mutate_if(is.numeric, round, 1)
       
@@ -534,7 +547,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     cc1_res=paste(round(posterior.mode(comp_res),dec_PM)," (",round(HPDinterval(comp_res)[,1],dec_PM), ", ",round(HPDinterval(comp_res)[,2],dec_PM),")",sep="")
     cc1_diff=paste(round(posterior.mode(comp_diff),dec_PM+2)," (",round(HPDinterval(comp_diff)[,1],dec_PM), ", ",round(HPDinterval(comp_diff)[,2],dec_PM),")",sep="")
     
-    cc1=data.frame("Variable"=composition_var,"Community Comparison"=colnames(comp_res),"Posterior Mode (CI)"=cc1_res, "Difference Posterior Mode (CI)"=cc1_diff, "pMCMC"=round(as.numeric(cc1_p),3),check.names=FALSE)
+    cc1=data.frame("Variable"=composition_var,"Community Comparison"=colnames(comp_res),"Posterior Mode (CI)"=cc1_res, "Difference from Random Posterior Mode (CI)"=cc1_diff, "pMCMC"=round(as.numeric(cc1_p),3),check.names=FALSE)
     
     #Combine results
     community = rbind(community,cc1)

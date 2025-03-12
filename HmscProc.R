@@ -463,39 +463,89 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     comp_res = data.frame()
     comp_diff = data.frame()
     
+    #Randomise response data
+    rand_list <- vector("list", length(comp_1_predictions))
+    for (r in 1:length(comp_1_predictions)) {
+      rand_list[[r]] <- model$Y[sample(nrow(model$Y)), sample(ncol(model$Y))]
+    }
+    
     #for each iteration calculate dissimilarity and write to results to dataframe
     for(j in 1:length(comp_1_predictions)){
+      #Predict real data for each iteration
       dissim = as.data.frame(comp_1_predictions[j]) #model predictions 
       
-      #Code below creates random expectation by sampling from a Poisson distribution with mean = to prevalence of each taxa. If jaccard then set max to 1 (e.g. present)
-      tax_means = as.data.frame(model$Y) 
-      tax_means = colMeans(tax_means) #mean prevalence/abundance of each taxa
+      #run model on randomised data for each model
+      modelR = Hmsc(Y = rand_list[[j]], XData=model$XData,
+                 XFormula = as.formula(model$XFormula),
+                 studyDesign = model$studyDesign,
+                 ranLevels=model$ranLevels, #this models residual correlations between species
+                 phyloTree = model$phyloTree,
+                 distr = model$distr)
+      #Run
+      modelR = sampleMcmc(modelR, thin = 1, samples = 2, transient = 0,
+                       nChains = 1, verbose = 0, nParallel = 1,updater=list(GammaEta=FALSE))
+      #Construct predictions
+      comp_1R = constructGradient(modelR, focalVariable = composition_var,non.focalVariables = 1)
       
-      if (composition_metric == "jaccard") {
-      #dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
-      dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
-      for (k in 1:ncol(dissim)) {
-          dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
-        }
-      dissimR = pmin(dissimR, 1)
-      } else {
-            if (response_logged == TRUE) {
-            #Backtransform if response is logged
-            dissim = exp(as.matrix(dissim))
-            dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
-            for (k in 1:ncol(dissim)) {
-              dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
-            }
-            dissimR = log(dissimR+1)
-            } else {
-              dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
-              for (k in 1:ncol(dissim)) {
-                dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
-              }
-            }
-      }
+      #Predict values
+      comp_1_predictionsR = predict(modelR, 
+                                    XData=comp_1R$XDataNew, 
+                                    studyDesign=comp_1R$studyDesignNew, 
+                                    ranLevels=comp_1R$rLNew)
+      dissimR = as.data.frame(comp_1_predictionsR[2]) 
       
-      #Randomise data within each column of the data. Not used as doesn't randomise data for taxa within invariant abundances
+      #Blocked out code are different ways of randomising data. Not used as make more assumptions than randomising response data.
+      # #for each iteration calculate dissimilarity and write to results to dataframe
+      # for(j in 1:length(comp_1_predictions)){
+      #   dissim = as.data.frame(comp_1_predictions[j]) #model predictions 
+      #   
+      #   #Code below creates random expectation by sampling from a Poisson distribution with mean = to prevalence of each taxa. If jaccard then set max to 1 (e.g. present)
+      #   tax_means = as.data.frame(model$Y) 
+      #   tax_means = colMeans(tax_means) #mean prevalence/abundance of each taxa
+      #   
+      #   if (composition_metric == "jaccard") {
+      #   #dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
+      #   dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
+      #   for (k in 1:ncol(dissim)) {
+      #       dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
+      #     }
+      #   dissimR = pmin(dissimR, 1)
+      #   } else {
+      #         if (response_logged == TRUE) {
+      #         #Backtransform if response is logged
+      #         dissim = exp(as.matrix(dissim))
+      #         dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
+      #         for (k in 1:ncol(dissim)) {
+      #           dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
+      #         }
+      #         dissimR = log(dissimR+1)
+      #         } else {
+      #           dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
+      #           for (k in 1:ncol(dissim)) {
+      #             dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
+      #           }
+      #         }
+      #   }
+      #   
+      #Randomise data within each column of the data. Not used as doesn't take into account overall abundances of taxa, just predicted abundances within community comparisons leading to a lot of invariant values and high similarity with real predicted values.
+      # for(j in 1:length(comp_1_predictions)){
+      #   dissim = as.data.frame(comp_1_predictions[j]) #model predictions 
+      #   
+      #   if (composition_metric == "jaccard") {
+      #     #dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
+      #     dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
+      #     dissimR = pmin(dissimR, 1)
+      #   } else {
+      #     if (response_logged == TRUE) {
+      #       #Predict for each sample, randomise and calculate dissimilarity
+      #       #Backtransform if response is logged
+      #       dissim = exp(as.matrix(dissim))
+      #       dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
+      #     } else {
+      #       dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
+      #     }
+      #   }
+      #   
       # if (response_logged == TRUE) {
       #   #Predict for each sample, randomise and calculate dissimilarity
       #   #Backtransform if response is logged
@@ -505,9 +555,11 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
       #   dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
       # }
       
+      #rename
       dissim_names = data.frame(code =rownames(comp_1$XDataNew),names=comp_1$XDataNew[,composition_var])
       dissim_names = dissim_names %>% mutate_if(is.numeric, round, 1)
       
+      #Calculate similarity
       real = melt(as.matrix(vegdist(dissim, method = composition_metric)), varnames = c("code1", "code2"), value.name = composition_metric) #dissimilarity measure on real data
       ran = melt(as.matrix(vegdist(dissimR, method = composition_metric)), varnames = c("code1", "code2"), value.name = paste(composition_metric,"R",sep="")) #dissimilarity measure on randomised data
       
@@ -544,8 +596,8 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     cc1_p = pmax(0.5/dim(comp_diff)[1], pmin(colSums(comp_diff[,1:nC, drop = FALSE] > 0)/dim(comp_diff)[1], 1 - colSums(comp_diff[, 1:nC, drop = FALSE] > 0)/dim(comp_diff)[1]))*2
     
     #Format estimates
-    cc1_res=paste(round(posterior.mode(comp_res),dec_PM)," (",round(HPDinterval(comp_res)[,1],dec_PM), ", ",round(HPDinterval(comp_res)[,2],dec_PM),")",sep="")
-    cc1_diff=paste(round(posterior.mode(comp_diff),dec_PM+2)," (",round(HPDinterval(comp_diff)[,1],dec_PM), ", ",round(HPDinterval(comp_diff)[,2],dec_PM),")",sep="")
+    cc1_res=paste(round(mean(comp_res),dec_PM)," (",round(HPDinterval(comp_res)[,1],dec_PM), ", ",round(HPDinterval(comp_res)[,2],dec_PM),")",sep="")
+    cc1_diff=paste(round(mean(comp_diff),dec_PM)," (",round(HPDinterval(comp_diff)[,1],dec_PM), ", ",round(HPDinterval(comp_diff)[,2],dec_PM),")",sep="")
     
     cc1=data.frame("Variable"=composition_var,"Community Comparison"=colnames(comp_res),"Posterior Mode (CI)"=cc1_res, "Difference from Random Posterior Mode (CI)"=cc1_diff, "pMCMC"=round(as.numeric(cc1_p),3),check.names=FALSE)
     

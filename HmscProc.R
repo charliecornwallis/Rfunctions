@@ -436,12 +436,6 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
       colnames(comp_1$XDataNew)[1] = comp_names[1]
       composition_var = comp_names[1]
       
-      #Setup comparisons
-      #composition_comp = expand_grid(as.factor(round(comp_1$XDataNew[,1],1)),as.factor(round(comp_1$XDataNew[,1],1)))
-      #colnames(composition_comp) = c("point1","point2")
-      #composition_comp = composition_comp %>% mutate(comparison = paste(point1,point2, sep = " vs "))
-      #composition_comp = as.character(composition_comp$comparison)
-      
     } else  {
       #categorical effects
       composition_comp = community_comparisons[[i]]$composition_comp
@@ -465,17 +459,17 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     
     #Randomise response data
     rand_list <- vector("list", length(comp_1_predictions))
-    for (r in 1:length(comp_1_predictions)) {
-      rand_list[[r]] <- model$Y[sample(nrow(model$Y)), sample(ncol(model$Y))]
+    for (j in 1:length(comp_1_predictions)) {
+      rand_list[[j]] <- model$Y[sample(nrow(model$Y)), sample(ncol(model$Y))]
     }
     
     #for each iteration calculate dissimilarity and write to results to dataframe
-    for(j in 1:length(comp_1_predictions)){
+    for(k in 1:length(comp_1_predictions)){
       #Predict real data for each iteration
-      dissim = as.data.frame(comp_1_predictions[j]) #model predictions 
+      dissim = as.data.frame(comp_1_predictions[k]) #model predictions 
       
       #run model on randomised data for each model
-      modelR = Hmsc(Y = rand_list[[j]], XData=model$XData,
+      modelR = Hmsc(Y = rand_list[[k]], XData=model$XData,
                  XFormula = as.formula(model$XFormula),
                  studyDesign = model$studyDesign,
                  ranLevels=model$ranLevels, #this models residual correlations between species
@@ -578,7 +572,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
       comp_diff = rbind(comp_diff,tmp2) #combine difference estimates from different iterations
     }
     
-    #remove rows where differences between communities weren't possible to calculate
+    #remove rows where differences between communities weren't possible to calculate. This can happen where categories to be compared both have 0 presence.
     comp_res = comp_res[complete.cases(comp_res),] 
     comp_diff = comp_diff[complete.cases(comp_diff),] 
     
@@ -596,8 +590,8 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     cc1_p = pmax(0.5/dim(comp_diff)[1], pmin(colSums(comp_diff[,1:nC, drop = FALSE] > 0)/dim(comp_diff)[1], 1 - colSums(comp_diff[, 1:nC, drop = FALSE] > 0)/dim(comp_diff)[1]))*2
     
     #Format estimates
-    cc1_res=paste(round(mean(comp_res),dec_PM)," (",round(HPDinterval(comp_res)[,1],dec_PM), ", ",round(HPDinterval(comp_res)[,2],dec_PM),")",sep="")
-    cc1_diff=paste(round(mean(comp_diff),dec_PM)," (",round(HPDinterval(comp_diff)[,1],dec_PM), ", ",round(HPDinterval(comp_diff)[,2],dec_PM),")",sep="")
+    cc1_res=paste(round(posterior.mode(comp_res),dec_PM)," (",round(HPDinterval(comp_res)[,1],dec_PM), ", ",round(HPDinterval(comp_res)[,2],dec_PM),")",sep="")
+    cc1_diff=paste(round(posterior.mode(comp_diff),dec_PM)," (",round(HPDinterval(comp_diff)[,1],dec_PM), ", ",round(HPDinterval(comp_diff)[,2],dec_PM),")",sep="")
     
     cc1=data.frame("Variable"=composition_var,"Community Comparison"=colnames(comp_res),"Posterior Mode (CI)"=cc1_res, "Difference from Random Posterior Mode (CI)"=cc1_diff, "pMCMC"=round(as.numeric(cc1_p),3),check.names=FALSE)
     

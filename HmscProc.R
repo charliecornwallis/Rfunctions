@@ -401,9 +401,9 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   writeData(workbook, sheet, "Fit statistics", startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+dim(ge1)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+5,headerStyle = hs2)
   writeData(workbook, sheet, model_fit, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+dim(ge1)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+7,headerStyle = hs2)
   
-  #****************************************************
-  #Section 2: Community comparisons ----
-  #****************************************************
+#****************************************************
+#Section 2: Community comparisons ----
+#****************************************************
 
   if(is.null(community_comparisons)) {
   #nothing to do done
@@ -492,8 +492,33 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
           }
         }
       }
-    } 
-    }  else  {   
+      
+      #rename
+      dissim_names = data.frame(code =rownames(comp_1$XDataNew),names=comp_1$XDataNew[,composition_var])
+      dissim_names = dissim_names %>% mutate_if(is.numeric, round, 1)
+      
+      #Calculate similarity
+      real = melt(as.matrix(vegdist(dissim, method = composition_metric)), varnames = c("code1", "code2"), value.name = composition_metric) #dissimilarity measure on real data
+      ran = melt(as.matrix(vegdist(dissimR, method = composition_metric)), varnames = c("code1", "code2"), value.name = paste(composition_metric,"R",sep="")) #dissimilarity measure on randomised data
+      
+      tmp = left_join(real,ran, by = c("code1" = "code1", "code2" = "code2")) 
+      tmp = tmp %>% mutate(diff=tmp[,3]-tmp[,4], #calculate difference in dissimlarity metric between real and randomised data
+                           name_1=dissim_names$names[match(code1,dissim_names$code)], #change actual names
+                           name_2=dissim_names$names[match(code2,dissim_names$code)], #change actual names
+                           name_12=paste0(name_1," vs ",name_2)) %>% 
+        filter(name_1 != name_2) %>%
+        dplyr::select(-c(code1,code2,name_1,name_2)) 
+      
+      tmp1 = tmp %>% dplyr::select(name_12, composition_metric) %>% pivot_wider(names_from = name_12, values_from = composition_metric) #matrix of real values
+      tmp2 = tmp %>% dplyr::select(name_12, diff) %>% pivot_wider(names_from = name_12, values_from = diff) #matrix of differences between real and randomised values
+      
+      comp_res = rbind(comp_res,tmp1) #combine estimates from different iterations
+      comp_diff = rbind(comp_diff,tmp2) #combine difference estimates from different iterations
+      }
+      
+    }  else  {
+      
+    #*******************************************  
     #Randomise response data: takes along time
     rand_list <- vector("list", length(comp_1_predictions))
     for (j in 1:length(comp_1_predictions)) {
@@ -525,9 +550,6 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
                                     ranLevels=comp_1R$rLNew)
       dissimR = as.data.frame(comp_1_predictionsR[2]) 
      
-    }  
-    }  
-      
       #rename
       dissim_names = data.frame(code =rownames(comp_1$XDataNew),names=comp_1$XDataNew[,composition_var])
       dissim_names = dissim_names %>% mutate_if(is.numeric, round, 1)
@@ -549,7 +571,9 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
       
       comp_res = rbind(comp_res,tmp1) #combine estimates from different iterations
       comp_diff = rbind(comp_diff,tmp2) #combine difference estimates from different iterations
-    }
+      
+    }  
+    }  
     
     #remove rows where differences between communities weren't possible to calculate. This can happen where categories to be compared both have 0 presence.
     comp_res = comp_res[complete.cases(comp_res),] 

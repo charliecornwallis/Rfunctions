@@ -2,13 +2,13 @@
 #Function for processing Hmsc models#
 #***************************************
 
-HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",pvalues = "include",traits="exclude",pvalues_traits= "exclude",VP_ave = "include",VPnames=NULL,randomvar_names=NULL,Include_random = "yes",Include_species ="exclude",pvalues_species="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",community_comparisons = NULL,response_logged = FALSE,padding=4,dec_PM=2)
+HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",pvalues = "include",traits="exclude",pvalues_traits= "exclude",VP_ave = "include",VPnames=NULL,randomvar_names=NULL,Include_random = "yes",Include_species ="exclude",pvalues_species="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",community_comparisons = NULL,randomisation = "poisson",response_logged = FALSE,padding=4,dec_PM=2)
 { 
   #Explanation ----
   #1. Takes an Hmsc model and combines estimates from multiple chains and output 2 excel sheets: 1) averages across species; 2) Per species values. If there are multiple species these are averaged per mcmc sample using rowMeans to produce posterior distribution of average effects.
   #2. Estimates posterior modes and HPDintervals for effects
   #3. Calculates specified differences for fixed effects
-  #4. If community_comparisons is specified (list of composition_metric,composition_variables, composition_comparisons (factors) and ngrid (# cut points for continuous variables default is 5) then it will calculate community compositon differences and test if they are different from randomised data (random data is created by randomising predicted values across variables). response_logged=TRUE is used if log counts are modelled.
+  #4. If community_comparisons is specified (list of composition_metric,composition_variables, composition_comparisons (factors) and ngrid (# cut points for continuous variables default is 5) then it will calculate community composition differences and test if they are different from randomised data. Random communities are created in two possible ways: randomisation = "poisson" creates communities by sampling each taxa from a Poisson distribution with mean = mean taxa presence / abundance.response_logged=TRUE is used if log counts are modelled. Randomisation != poisson reruns model using randomised occurrence matrix (warning this can be slow).
   #5. For models with trait data, combines runs and estimates trait effects
   #6. Calculates average variance explained by random effects
   #7. Calculates % variation of explained by fixed and random effects 
@@ -457,7 +457,44 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     comp_res = data.frame()
     comp_diff = data.frame()
     
-    #Randomise response data
+    #Comparing communities to randomised community
+    if(randomisation == "poisson") {
+    
+    #Compared to communities sample from Poisson distribution with mean = to prevalence of each taxa
+    #for each iteration calculate dissimilarity and write to results to dataframe
+    for(j in 1:length(comp_1_predictions)){
+      dissim = as.data.frame(comp_1_predictions[j]) #model predictions
+      
+      #Code below creates random expectation by sampling from a Poisson distribution with mean = to prevalence of each taxa. If jaccard then set max to 1 (e.g. present)
+      tax_means = as.data.frame(model$Y)
+      tax_means = colMeans(tax_means) #mean prevalence/abundance of each taxa
+      
+      if (composition_metric == "jaccard") {
+        #dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
+        dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
+        for (k in 1:ncol(dissim)) {
+          dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
+        }
+        dissimR = pmin(dissimR, 1)
+      } else {
+        if (response_logged == TRUE) {
+          #Backtransform if response is logged
+          dissim = exp(as.matrix(dissim))
+          dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
+          for (k in 1:ncol(dissim)) {
+            dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
+          }
+          dissimR = log(dissimR+1)
+        } else {
+          dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
+          for (k in 1:ncol(dissim)) {
+            dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
+          }
+        }
+      }
+    } 
+    }  else  {   
+    #Randomise response data: takes along time
     rand_list <- vector("list", length(comp_1_predictions))
     for (j in 1:length(comp_1_predictions)) {
       rand_list[[j]] <- model$Y[sample(nrow(model$Y)), sample(ncol(model$Y))]
@@ -487,67 +524,9 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
                                     studyDesign=comp_1R$studyDesignNew, 
                                     ranLevels=comp_1R$rLNew)
       dissimR = as.data.frame(comp_1_predictionsR[2]) 
-      
-      #Blocked out code are different ways of randomising data. Not used as make more assumptions than randomising response data.
-      # #for each iteration calculate dissimilarity and write to results to dataframe
-      # for(j in 1:length(comp_1_predictions)){
-      #   dissim = as.data.frame(comp_1_predictions[j]) #model predictions 
-      #   
-      #   #Code below creates random expectation by sampling from a Poisson distribution with mean = to prevalence of each taxa. If jaccard then set max to 1 (e.g. present)
-      #   tax_means = as.data.frame(model$Y) 
-      #   tax_means = colMeans(tax_means) #mean prevalence/abundance of each taxa
-      #   
-      #   if (composition_metric == "jaccard") {
-      #   #dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
-      #   dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
-      #   for (k in 1:ncol(dissim)) {
-      #       dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
-      #     }
-      #   dissimR = pmin(dissimR, 1)
-      #   } else {
-      #         if (response_logged == TRUE) {
-      #         #Backtransform if response is logged
-      #         dissim = exp(as.matrix(dissim))
-      #         dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
-      #         for (k in 1:ncol(dissim)) {
-      #           dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
-      #         }
-      #         dissimR = log(dissimR+1)
-      #         } else {
-      #           dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
-      #           for (k in 1:ncol(dissim)) {
-      #             dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
-      #           }
-      #         }
-      #   }
-      #   
-      #Randomise data within each column of the data. Not used as doesn't take into account overall abundances of taxa, just predicted abundances within community comparisons leading to a lot of invariant values and high similarity with real predicted values.
-      # for(j in 1:length(comp_1_predictions)){
-      #   dissim = as.data.frame(comp_1_predictions[j]) #model predictions 
-      #   
-      #   if (composition_metric == "jaccard") {
-      #     #dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
-      #     dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
-      #     dissimR = pmin(dissimR, 1)
-      #   } else {
-      #     if (response_logged == TRUE) {
-      #       #Predict for each sample, randomise and calculate dissimilarity
-      #       #Backtransform if response is logged
-      #       dissim = exp(as.matrix(dissim))
-      #       dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
-      #     } else {
-      #       dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
-      #     }
-      #   }
-      #   
-      # if (response_logged == TRUE) {
-      #   #Predict for each sample, randomise and calculate dissimilarity
-      #   #Backtransform if response is logged
-      #   dissim = exp(as.matrix(dissim))
-      #   dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
-      # } else {
-      #   dissimR = as.matrix(apply(dissim, 2, function(col) sample(col,replace = T)))
-      # }
+     
+    }  
+    }  
       
       #rename
       dissim_names = data.frame(code =rownames(comp_1$XDataNew),names=comp_1$XDataNew[,composition_var])

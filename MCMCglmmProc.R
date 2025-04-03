@@ -521,17 +521,16 @@ xl_2_df2 = function(xltab,sheet=NULL){
 
 #******************************************************
 #function for renaming sheets in xl workbook
-rename_xlsheets <- function(wb,name) {
+rename_xlsheets = function(wb,name) {
   # Get the names of all sheets
   sheet_names <- names(wb)
   
   # Loop through each sheet and rename it
   for (i in seq_along(sheet_names)) {
-    new_name <- paste0(name, i,": ",sheet_names[i])
-    renameWorksheet(wb, sheet = sheet_names[i], newName = new_name)
+    new_name <- paste0(name, i)
+    names(wb)[[i]]=new_name
   }
 }
-
 
 #******************************************************
 #function for df to Rmd table

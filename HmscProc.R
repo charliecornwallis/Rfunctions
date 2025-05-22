@@ -66,8 +66,9 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #****************************************************
   #Fixed effects ----
   #****************************************************
-  tmp1 = combine.mcmc(post_model$Beta)
-  
+  #combine chains
+  tmp1 <- do.call(rbind, post_model$Beta)
+
   #If multiple species average across
   fixed_mod<-matrix(nrow = nrow(tmp1),ncol = (ncol(tmp1)/model$ns))
   
@@ -210,8 +211,8 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #Trait effects ----
   #****************************************************
   #combine chains
-  gamma = combine.mcmc(post_model$Gamma)
-  
+  gamma = do.call(rbind, post_model$Gamma)
+
   #Rename model trait names
   if(is.null(trait_names)) {
   } else  {model$trNames<-trait_names
@@ -255,7 +256,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   
   for(i in 1:length(post_model$Omega)){
     #combine chains 
-    tmp1 = combine.mcmc(post_model$Omega[i])
+    tmp1 = do.call(rbind, post_model$Omega[i])
     tmp2= matrix(nrow = dim(tmp1)[1], ncol =model$ns)
     
     #extract variances for each species for each random effect
@@ -640,7 +641,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #****************************************************
     #Fixed effects ----
     #****************************************************
-    fixed_mod = combine.mcmc(post_model$Beta)
+    fixed_mod = do.call(rbind, post_model$Beta)
     
     #Rename model fixed effects
     if(is.null(fixed_names)) {
@@ -702,7 +703,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     
     for(i in 1:length(post_model$Omega)){
       #combine chains 
-      tmp1 = combine.mcmc(post_model$Omega[1])
+      tmp1 = do.call(rbind, post_model$Omega[1])
       tmp2= matrix(nrow = dim(tmp1)[1], ncol =model$ns)
       
       #extract variances for each species for each random effect

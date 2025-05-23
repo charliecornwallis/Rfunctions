@@ -642,6 +642,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #Fixed effects ----
     #****************************************************
     fixed_mod = do.call(rbind, post_model$Beta)
+    fixed_mod = as.mcmc(fixed_mod)
     
     #Rename model fixed effects
     if(is.null(fixed_names)) {

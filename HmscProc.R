@@ -515,7 +515,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
         filter(name_1 != name_2) %>%
         dplyr::select(-c(code1,code2,name_1,name_2)) 
 
-      tmp1 = tmp %>% dplyr::select(name_12, 1) %>% pivot_wider(names_from = name_12, values_from = composition_metric) #matrix of real values
+      tmp1 = tmp %>% dplyr::select(name_12, composition_metric) %>% pivot_wider(names_from = name_12, values_from = composition_metric) #matrix of real values
       tmp2 = tmp %>% dplyr::select(name_12, diff) %>% pivot_wider(names_from = name_12, values_from = diff) #matrix of differences between real and randomised values
 
       
@@ -573,7 +573,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
         filter(name_1 != name_2) %>%
         dplyr::select(-c(code1,code2,name_1,name_2)) 
       
-        tmp1 = tmp %>% dplyr::select(name_12, 1) %>% pivot_wider(names_from = name_12, values_from = composition_metric) #matrix of real values
+        tmp1 = tmp %>% dplyr::select(name_12, composition_metric) %>% pivot_wider(names_from = name_12, values_from = composition_metric) #matrix of real values
         tmp2 = tmp %>% dplyr::select(name_12, diff) %>% pivot_wider(names_from = name_12, values_from = diff) #matrix of differences between real and randomised values
 
       comp_res = rbind(comp_res,tmp1) #combine estimates from different iterations

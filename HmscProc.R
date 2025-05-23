@@ -256,7 +256,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   
   for(i in 1:length(post_model$Omega)){
     #combine chains 
-    tmp1 = do.call(rbind, post_model$Omega[i])
+    tmp1 = do.call(rbind, post_model$Omega[[i]])
     tmp2= matrix(nrow = dim(tmp1)[1], ncol =model$ns)
     
     #extract variances for each species for each random effect
@@ -703,7 +703,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     
     for(i in 1:length(post_model$Omega)){
       #combine chains 
-      tmp1 = do.call(rbind, post_model$Omega[1])
+      tmp1 = do.call(rbind, post_model$Omega[[i]])
       tmp2= matrix(nrow = dim(tmp1)[1], ncol =model$ns)
       
       #extract variances for each species for each random effect

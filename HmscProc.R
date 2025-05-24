@@ -306,16 +306,6 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   }
   
   #****************************************************
-  #Fit statistics ----
-  #****************************************************
-  # To assess model fit in terms of $R^2$, we apply the `evaluateModelFit` function to the posterior predictive distribution computed by the function `computePredictedValues`.
-  model_preds = computePredictedValues(model)
-  model_fit = as.data.frame(evaluateModelFit(model, predY=model_preds))
-  
-  #Round fit stats
-  model_fit = model_fit %>% dplyr::summarise(across(everything(), ~mean(., na.rm=T))) %>% mutate(across(everything(), ~round(., 2))) 
-  
-  #****************************************************
   #Phylo effects ----
   #****************************************************
   #Rho = does not ask whether the species traits are correlated with the phylogeny, a question that is often in the focus of phylogenetic comparative analyses. Instead, the phylogenetic signal parameter ρ measures whether the species niches (i.e., their responses to the environmental covariates, as measured by the β parameters) show phylogenetic correlations.
@@ -325,6 +315,16 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     rho = paste(round(posterior.mode(rho),dec_PM)," (",round(HPDinterval(rho)[,1],dec_PM), ", ",round(HPDinterval(rho)[,2],dec_PM),")",sep="")
     rho = data.frame("Phylogenetic Effects"="Rho", "Posterior Mode (CI)"=rho,check.names=FALSE)
   }
+  
+  #****************************************************
+  #Fit statistics ----
+  #****************************************************
+  # To assess model fit in terms of $R^2$, we apply the `evaluateModelFit` function to the posterior predictive distribution computed by the function `computePredictedValues`.
+  model_preds = computePredictedValues(model)
+  model_fit = as.data.frame(evaluateModelFit(model, predY=model_preds))
+  
+  #Round fit stats
+  model_fit = model_fit %>% dplyr::summarise(across(everything(), ~mean(., na.rm=T))) %>% mutate(across(everything(), ~round(., 2))) 
   
   #****************************************************
   ##Excel output: fixed and random effects ----
@@ -386,14 +386,14 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #Should they be outputted or not
   if(Include_random == "yes") {
     writeData(workbook, sheet, randomVar, startCol = 1, startRow = row_nums,headerStyle = hs2)
-    row_nums = row_nums + dim(randomVar)[1]+2
+    row_nums = row_nums + dim(randomVar)[1]+1
   } else  {
     randomVar = data.frame()
   }
   
   if(VP_ave == "include") {
     writeData(workbook, sheet, VP, startCol = 1, startRow = row_nums,headerStyle = hs2)
-    row_nums = row_nums + dim(VP)[1]+3
+    row_nums = row_nums + dim(VP)[1]+1
   } else  {
   }
   
@@ -401,11 +401,13 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     workbook=workbook  
   } else  {
     writeData(workbook, sheet, rho, startCol = 1, startRow = row_nums,headerStyle = hs2)
-    row_nums = row_nums + dim(rho)[1]+4
+    row_nums = row_nums + dim(rho)[1]+2
     }
   
-  writeData(workbook, sheet, "Fit statistics", startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+dim(ge1)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+5,headerStyle = hs2)
-  writeData(workbook, sheet, model_fit, startCol = 1, startRow = start_row+dim(header)[1]+dim(fixedeff)[1]+1+dim(ge1)[1]+1+ifelse(dim(fixeddiff)[1] > 0,dim(fixeddiff)[1]+1,0)+dim(randomVar)[1]+2+dim(VP)[1]+7,headerStyle = hs2)
+  writeData(workbook, sheet, "Fit statistics",startCol = 1, startRow = row_nums,headerStyle = hs2)
+  addStyle(workbook, sheet, style = hs2, rows = row_nums, cols = 1:3, gridExpand = TRUE)
+
+  writeData(workbook, sheet, model_fit, startCol = 1, startRow = row_nums+1,headerStyle = hs2)
   
 #****************************************************
 #Section 2: Community comparisons ----
@@ -814,7 +816,9 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
       } else  {
     }
     
-    writeData(workbook, sheet3, "Fit statistics", startCol = 1, startRow = row_nums,headerStyle = hs2)
+    writeData(workbook, sheet3, "Fit statistics", startCol = 1:3, startRow = row_nums,headerStyle = hs2)
+    addStyle(workbook, sheet3, style = hs2, rows = row_nums, cols = 1, gridExpand = TRUE)
+
     writeData(workbook, sheet3, model_fit, startCol = 1, startRow = row_nums+2,headerStyle = hs2)
     return(workbook)
     

@@ -93,8 +93,17 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
   
   #Remove unwanted effects
   #Remove mev from random effect
-  model$VCV<-model$VCV[, colnames(model$VCV) !="sqrt(mev):sqrt(mev).meta"]
-  
+  if (any(colnames(model$VCV) =="sqrt(mev):sqrt(mev).meta")) {
+    model$Random$nfl <- model$Random$nfl[1:length(model$Random$nfl)-1]
+    model$Random$nrl <- model$Random$nrl[1:length(model$Random$nrl)-1]
+    model$Random$nat <- model$Random$nat[1:length(model$Random$nat)-1]
+    model$Random$nrt <- model$Random$nrt[1:length(model$Random$nrt)-1]
+
+    model$VCV<-model$VCV[, colnames(model$VCV) !="sqrt(mev):sqrt(mev).meta"]
+
+  } else {
+  }
+
   #Rename model fixed effects
   if(is.null(fixed_names)) {
     fixed_names<- colnames(model$Sol)
@@ -352,7 +361,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
       }
       
       #Need to rename colnames to match randomvar_names & need to account for models with more than 1 residual variance notation
-      if(length(model$Residual$nfl>0)) {
+      if(length(model$Residual$nfl)>1) {
         number_random=sum(model$Random$nfl)+sum(model$Residual$nfl) #add up random variances and residual variances
         colnames(t_icc)<-randomvar_names[seq(from=i,to=number_random,by=length(responses))]
         icc_all<-cbind(icc_all,t_icc)
@@ -537,6 +546,7 @@ rename_xlsheets = function(wb,name,start_sheet=1) {
 #******************************************************
 #function for df to Rmd table
 md <- function(data,stats=FALSE) {
+  pacman::p_load(flextable,officer)
   #Output if html format
   if (knitr::is_html_output()) {
     pacman::p_load(kableExtra)

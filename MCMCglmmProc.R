@@ -1,6 +1,6 @@
-#***************************************
+#===========================================================
 #Function for processing MCMCglmm models#
-#***************************************
+#===========================================================
 
 #Trouble shooting tools----
 # model=m
@@ -62,9 +62,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
   #Load packages and naming ----
   pacman::p_load(MCMCglmm,coda,openxlsx,stringdist,kableExtra)
 
-  #****************************************************
+  #===========================================================
   #Check terms are specified correctly and relabel terms ----
-  #****************************************************
+  #===========================================================
   if (is.null(fixed_names) & any(fixed_diffinc != "none")) {
     stop("fixed names needs to be specified for fixed_diffinc to be calculated")
   } else {
@@ -110,9 +110,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
   } else  {colnames(model$Sol)<-fixed_names
   }
   
-  #****************************************************
+  #===========================================================
   #Fixed effects and Differences between levels ----
-  #****************************************************
+  #===========================================================
   #Main effects
   nF=dim(model$Sol)[2]
   fe1=paste(round(posterior.mode(model$Sol),dec_PM)," (",round(HPDinterval(model$Sol)[,1],dec_PM), ", ",round(HPDinterval(model$Sol)[,2],dec_PM),")",sep="")
@@ -235,9 +235,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
   fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
   fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
   
-  #****************************************************
+  #===========================================================
   #Excel output: fixed effects ----
-  #****************************************************
+  #===========================================================
   #Create excel workbook if not specified
   if(is.null(workbook)) {
     workbook<- createWorkbook()
@@ -276,9 +276,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
   bolding<-createStyle(textDecoration="bold")
   conditionalFormatting(workbook, sheet, cols=3, rows=1:10000, rule="<0.05", style = bolding)
 
-  #****************************************************
+  #===========================================================
   #Random effects ----
-  #****************************************************
+  #===========================================================
   #Random effects: variances
   #Should they be estimated or not?
   if(Include_random == "no") {
@@ -324,8 +324,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
   } else  {colnames(var_terms)<-randomvar_names
   }
   
-  #****************************************************
+  #===========================================================
   ##Variance output ----
+  #===========================================================
   #Summary of variance components
   rand1=paste(round(posterior.mode(var_terms),dec_PM)," (",round(HPDinterval(var_terms)[,1],dec_PM), ", ",round(HPDinterval(var_terms)[,2],dec_PM),")",sep="")
   
@@ -414,20 +415,20 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
     randomVar<-data.frame("Random Effects"=c(colnames(var_terms),names(icc_S2var)),"Posterior Mode (CI)"=c(rand1,round(S2var,dec_PM)),"I2 % (CI)"=c(icc1,icc_S2var), check.names=FALSE)
   }
   
-}
+  }
   
 
-  #****************************************************
+  #===========================================================
   #Excel output: random effects ----
-  #****************************************************
+  #===========================================================
   writeData(workbook, sheet, randomVar, startCol = 1, startRow = row_nums,headerStyle = hs2)
   row_nums = row_nums + dim(randomVar)[1]+2
   
   }
   
-  #****************************************************
+  #===========================================================
   #Correlations ----
-  #****************************************************
+  #===========================================================
   if(Include_random == "no") {
     #If no random effects are estimated then skip correlation estimation
   } else  {
@@ -512,8 +513,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
   return(workbook)
 }
 
-#******************************************************
+#===========================================================
 #function for extracting df from xl workbook
+#===========================================================
 xl_2_df = function(xltab,sheet=NULL){
   df<-readWorkbook(xltab,sheet=sheet,startRow = 2)
   colnames(df)<-gsub("[.]"," ",colnames(df))
@@ -528,8 +530,9 @@ xl_2_df2 = function(xltab,sheet=NULL){
   return(df)
 }
 
-#******************************************************
+#===========================================================
 #function for renaming sheets in xl workbook
+#===========================================================
 rename_xlsheets = function(wb,name,start_sheet=1) {
   # Get the names of all sheets
   sheet_names = names(wb)
@@ -543,29 +546,39 @@ rename_xlsheets = function(wb,name,start_sheet=1) {
   }
 }
 
-#******************************************************
-#function for df to Rmd table
+#===========================================================
+#function for df to md table that can handle html and other formats e.g. word ----
+#===========================================================
 md <- function(data,stats=FALSE) {
   pacman::p_load(flextable,officer)
-  #Output if html format
-  if (knitr::is_html_output()) {
-    pacman::p_load(kableExtra)
-    #Output if presenting mixed model stats: bolding significant values and highlighting headings
-    if(stats == TRUE){
+
+##Output if presenting mixed model stats: bolding significant values and highlighting headings
+  if(stats == TRUE){
       if(length(grep("Random",data$`Fixed Effects`))>0 & length(grep("Correlations",data$`Fixed Effects`))>0) {
         Fixed<-data[1:(as.numeric(row.names(data[grepl("Random",data$`Fixed Effects`),]))-1),]
         Random<-data[as.numeric(row.names(data[grepl("Random",data$`Fixed Effects`),])):(as.numeric(row.names(data[grepl("Correlations",data$`Fixed Effects`),]))-1),]
         Corrs<-data[as.numeric(row.names(data[grepl("Correlations",data$`Fixed Effects`),])):dim(data)[1],]
         rows_bold<-c(ifelse(Fixed$pMCMC<0.05,T,F),ifelse(Random$pMCMC<0.05,F,F),ifelse(Corrs$pMCMC<0.05,T,F))
-      } else  {if(length(grep("Random",data$`Fixed Effects`))>0) {
+      } else  {
+        if(length(grep("Random",data$`Fixed Effects`))>0) {
         Fixed<-data[1:(as.numeric(row.names(data[grepl("Random",data$`Fixed Effects`),]))-1),]
         Random<-data[as.numeric(row.names(data[grepl("Random",data$`Fixed Effects`),])):dim(data)[1],]
         rows_bold<-c(ifelse(Fixed$pMCMC<0.05,T,F),ifelse(Random$pMCMC<0.05,F,F))
-      } else  {
-        Fixed<-data
-        rows_bold<-ifelse(Fixed$pMCMC<0.05,T,F)
+          } else  {
+            Fixed<-data
+            rows_bold<-ifelse(Fixed$pMCMC<0.05,T,F)
+          }
       }
-      }
+  } else {
+    #Other tables 
+  } 
+  
+
+  #Output if html format
+  if (knitr::is_html_output()) {
+  
+  if(stats == TRUE){
+    pacman::p_load(kableExtra)
       kbl(data, align = "l", digits = 3) |>
         kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11) |>
         row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid")|>
@@ -588,25 +601,75 @@ md <- function(data,stats=FALSE) {
         column_spec(1:ncol(data), width = "auto") |> 
         scroll_box(width = "1000px", height = "1000px")
     }
-  }
-  #Ouput for other formats
+ }
   else  {
-    flextable(data) |>
-      theme_vanilla() |>
-      fontsize(size = 10, part = "header") |>
-      fontsize(size = 8, part = "body") |>
-      bold(part = "header") |>
-      bg(part = "header", bg = "#E7E5E5") |>
-      border(border.top = fp_border(color = "black", width = 1), part = "header") |>
-      border(border.bottom = fp_border(color = "black", width = 1), part = "header") |>
-      border(border.bottom = fp_border(color = "black", width = 1), i = nrow(data)) |>
-      set_table_properties(width=1,layout = "autofit",opts_html = list(scroll = list(height = "1000px", freeze_first_column = TRUE)),opts_word = list(keep_with_next = TRUE))
+  #Ouput for other formats
+  if(stats == TRUE){ 
+
+  #Create table and highlight different sections
+  ft <-  flextable(data)
+   b <- fp_border(color = "black", width = 1)
+      # Fixed Effect Comparisons
+      fixedcomp_row <- grep("^Fixed Effect Comparisons", data[,1])
+      ft  <- ft |> bold(i = fixedcomp_row, part = "body", bold = TRUE) |> 
+                   bg(i = fixedcomp_row, part = "body", bg   = "#E7E5E5") |> 
+                   hline(i = fixedcomp_row-1, part = "body", border = b) |> 
+                   hline(i = fixedcomp_row, part = "body", border = b)
+
+    # Random
+    random_row <- grep("^Random", data[,1])
+    ft  <- ft |> bold(i = random_row, part = "body", bold = TRUE) |> 
+                            bg(i = random_row, part = "body", bg   = "#E7E5E5") |> 
+                            hline(i = random_row-1, part = "body", border = b) |> 
+                            hline(i = random_row, part = "body", border = b)
+    # Correlations
+    corr_row <- grep("^Correlations", data[,1])
+    ft  <- ft |> bold(i = corr_row, part = "body", bold = TRUE) |> 
+                                  bg(i = corr_row, part = "body", bg   = "#E7E5E5") |> 
+                                  hline(i = corr_row-1, part = "body", border = b) |> 
+                                  hline(i = corr_row, part = "body", border = b)
+    # Correlation comparisons
+    corrcomp_row <- grep("^Correlation comparions", data[,1])
+    ft  <- ft |> bold(i = corr_row, part = "body", bold = TRUE) |> 
+                                  bg(i = corr_row, part = "body", bg   = "#E7E5E5") |> 
+                                  hline(i = corr_row-1, part = "body", border = b) |> 
+                                  hline(i = corr_row, part = "body", border = b)
+    #Overall formatting
+    ft <- ft |>
+          theme_vanilla() |>
+          fontsize(size = 10, part = "header") |>
+          fontsize(size = 8, part = "body") |>
+          bold(part = "header") |>
+          #Bold pMCMC less than 0.05
+          bold(i = which(rows_bold), j = 3, bold = TRUE, part = "body") |> 
+          bg(part = "header", bg = "#E7E5E5") |>
+          border(border.top = fp_border(color = "black", width = 1), part = "header") |>
+          border(border.bottom = fp_border(color = "black", width = 1), part = "header") |>
+          border(border.bottom = fp_border(color = "black", width = 1), i = nrow(data)) |>
+          set_table_properties(width=1,layout = "autofit",opts_html = list(scroll = list(height = "1000px", freeze_first_column = TRUE)),opts_word = list(keep_with_next = TRUE))
+          autofit(ft)
   }
-}
+    else {
+    ft <- flextable(data) |>
+          theme_vanilla() |>
+          fontsize(size = 10, part = "header") |>
+          fontsize(size = 8, part = "body") |>
+          bold(part = "header") |>
+          bg(part = "header", bg = "#E7E5E5") |>
+          border(border.top = fp_border(color = "black", width = 1), part = "header") |>
+          border(border.bottom = fp_border(color = "black", width = 1), part = "header") |>
+          border(border.bottom = fp_border(color = "black", width = 1), i = nrow(data)) |>
+          set_table_properties(width=1,layout = "autofit",opts_html = list(scroll = list(height = "1000px", freeze_first_column = TRUE)),opts_word = list(keep_with_next = TRUE))
+
+      autofit(ft)
+    }
+    }
+ }
 
 
-#******************************************************
-#function for df to Rmd table
+#===========================================================
+#function for df to Rmd table ----
+#===========================================================
 md_table = function(df){
   pacman::p_load(kableExtra)
   if(length(grep("Random",df$`Fixed Effects`))>0 & length(grep("Correlations",df$`Fixed Effects`))>0) {
@@ -631,7 +694,9 @@ md_table = function(df){
     row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") %>%    
     column_spec(column=3, bold =rows_bold)}
 
-#******************************************************
+#===========================================================
+## 2nd version
+#===========================================================
 md_table2 = function(df){pacman::p_load(kableExtra)  
     kbl(df, align = "l", digits = 3) %>%    
     kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11) %>%    

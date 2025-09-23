@@ -168,7 +168,7 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
     fixed=rbind(fe1,fe2)
   
     #Include all else specified differences  
-  if(fixed_diffinc == "all") {
+  if(any(fixed_diffinc == "all")) {
     fixed = fixed %>% dplyr::select(Fixed_Effects,Estimates,pMCMC)
   } else  {
     fixed = fixed %>% dplyr::filter(Fixed_Effects %in% c(fixed_names,fixed_diffinc) == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC)

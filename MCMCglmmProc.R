@@ -166,9 +166,14 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
     #Differences between fixed effects
     fe2<-pairwise.diffs(model$Sol,nF=nF)
     fixed=rbind(fe1,fe2)
+  
+    #Include all else specified differences  
+  if(fixed_diffinc == "all") {
+    fixed = fixed %>% dplyr::select(Fixed_Effects,Estimates,pMCMC)
+  } else  {
     fixed = fixed %>% dplyr::filter(Fixed_Effects %in% c(fixed_names,fixed_diffinc) == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC)
   }
-  
+  }
   
   ##fixed_diff_diffs ----
   if(is.null(fixed_diff_diffs)) {
@@ -637,28 +642,28 @@ md <- function(data,stats=FALSE) {
     #Overall formatting
     ft <- ft |>
           theme_vanilla() |>
-          fontsize(size = 10, part = "header") |>
-          fontsize(size = 8, part = "body") |>
+          flextable::fontsize(size = 10, part = "header") |>
+          flextable::fontsize(size = 8, part = "body") |>
           bold(part = "header") |>
           #Bold pMCMC less than 0.05
           bold(i = which(rows_bold), j = 3, bold = TRUE, part = "body") |> 
           bg(part = "header", bg = "#E7E5E5") |>
-          border(border.top = fp_border(color = "black", width = 1), part = "header") |>
-          border(border.bottom = fp_border(color = "black", width = 1), part = "header") |>
-          border(border.bottom = fp_border(color = "black", width = 1), i = nrow(data)) |>
+          flextable::border(border.top = fp_border(color = "black", width = 1), part = "header") |>
+          flextable::border(border.bottom = fp_border(color = "black", width = 1), part = "header") |>
+          flextable::border(border.bottom = fp_border(color = "black", width = 1), i = nrow(data)) |>
           set_table_properties(width=1,layout = "autofit",opts_html = list(scroll = list(height = "1000px", freeze_first_column = TRUE)),opts_word = list(keep_with_next = TRUE))
           autofit(ft)
   }
     else {
     ft <- flextable(data) |>
           theme_vanilla() |>
-          fontsize(size = 10, part = "header") |>
-          fontsize(size = 8, part = "body") |>
+          flextable::fontsize(size = 10, part = "header") |>
+          flextable::fontsize(size = 8, part = "body") |>
           bold(part = "header") |>
           bg(part = "header", bg = "#E7E5E5") |>
-          border(border.top = fp_border(color = "black", width = 1), part = "header") |>
-          border(border.bottom = fp_border(color = "black", width = 1), part = "header") |>
-          border(border.bottom = fp_border(color = "black", width = 1), i = nrow(data)) |>
+          flextable::border(border.top = fp_border(color = "black", width = 1), part = "header") |>
+          flextable::border(border.bottom = fp_border(color = "black", width = 1), part = "header") |>
+          flextable::border(border.bottom = fp_border(color = "black", width = 1), i = nrow(data)) |>
           set_table_properties(width=1,layout = "autofit",opts_html = list(scroll = list(height = "1000px", freeze_first_column = TRUE)),opts_word = list(keep_with_next = TRUE))
 
       autofit(ft)

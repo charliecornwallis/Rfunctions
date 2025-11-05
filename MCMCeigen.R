@@ -1,11 +1,11 @@
-MCMCeigen = function(VCV,traits){
+MCMCeigen = function(VCV,ntraits){
   result = data.frame(iteration=as.numeric(),
                       eigen_vector=as.numeric(),
                       eigen_value=as.numeric(),
                       sum_values=as.numeric())
   
   for(i in 1:dim(VCV)[1]){ 
-    tmp = eigen(matrix(VCV[i,],traits,traits))
+    tmp = eigen(matrix(VCV[i,],ntraits,ntraits))
     tmp = data.frame(iteration=i,
                      eigen_vector=seq(1:dim(tmp$vectors)[1]),
                      eigen_value=tmp$values,

@@ -10,7 +10,7 @@
 # Include_random = "yes"
 # variances=
 # covariances =
-# randomvar_names=
+# randomvar_names= 
 # randomcovar_names =
 # cor_diffs = 
 # padding=3
@@ -23,10 +23,16 @@
 # pvalues="exclude"
 # S2var=0
 # cor_diff=NULL
+# 
 
 #Function ----
 
-MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2var=0,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,variances=NULL,covariances=NULL,randomvar_names=NULL,randomcovar_names=NULL,Include_random = "no",padding=4,dec_PM=2,pvalues="include",cor_diffs=NULL)
+MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="", padding=4,dec_PM=2, #specify output details
+                       model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2var=0,#specify model details
+                       fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL, pvalues="include", #fixed effect specifications
+                       Include_random = "no", variances=NULL,randomvar_names=NULL, #random effect specifications
+                       covariances=NULL,randomcovar_names=NULL,cor_diffs=NULL, #covariance specifications
+                      partial_vcvs = NULL, partial_names = NULL, pcor_diffs = NULL) #partial correlation specifications
 { 
   #Explanation of terms ----
   #model = MCMCglmm model
@@ -52,15 +58,21 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
   #responses = specify response variables can take multiple values for multi response
   #pvalues = exclusion of pMCMC values for fixed effects - "exclude" = exclude all, "include" = include all or index pvalues to be excluded e.g. "c(1,3)" removes 1st and 3rd, c(1:7) removes 1 to 7. Note pMCMC will still be calculated for fixed effect comparisons.
   #cor_diff = calculates differences between correlations. Should be specified in the same way as fixed_diffs e.g. c("cor1 vs cor2","cor1 vs cor3"...) 
-  
+  #partial_vcvs = specify the variance covariance (vcv) matrices that you want to calculate partial correlations for as a list [e.g. list(c(1:9),c(10:18)) ]   
+  #partial_names = name the traits for each set of partial correlations as a list [e.g. list(c("trait1 phylogeny","trait2 phylogeny","trait3 phylogeny"),c("trait1 residual","trait2 residual","trait3 residual")) ]
+  #pcor_diffs = specify the partial correlations that you want to compare. Names must match the partial names separated by vs [e.g. c("trait2 phylogeny_trait1 phylogeny vs trait2 residual_trait1 residual") ]
+
   #Naming aid ----
   #variances=c("trait1:trait1.animal","trait2:trait2.animal","trait3:trait3.animal","trait4:trait4.animal","trait5:trait5.animal","trait6:trait6.animal","trait7:trait7.animal","trait8:trait8.animal","trait9:trait9.animal","trait1:trait1.units","trait2:trait2.units","trait3:trait3.units","trait4:trait4.units","trait5:trait5.units","trait6:trait6.units","trait7:trait7.units","trait8:trait8.units","trait9:trait9.units"),
   #covariances =c("trait2:trait1.animal","trait3:trait1.animal","trait4:trait1.animal","trait5:trait1.animal","trait6:trait1.animal","trait7:trait1.animal","trait8:trait1.animal","trait9:trait1.animal","trait2:trait1.units","trait3:trait1.units","trait4:trait1.units","trait5:trait1.units","trait6:trait1.units","trait7:trait1.units","trait8:trait1.units","trait9:trait1.units"),
   #randomvar_names=c("Phylogeny Trait1","Phylogeny Trait2","Phylogeny Trait3","Phylogeny Trait4","Phylogeny Trait5","Phylogeny Trait6","Phylogeny Trait7", "Phylogeny Trait8","Phylogeny Trait9","Residual Trait1","Residual Trait2","Residual Trait3","Residual Trait4","Residual Trait5","Residual Trait6","Residual Trait7","Residual Trait8","Residual Trait9"),
   #randomcovar_names =c("Phylogeny Trait2 : Phylogeny Trait1","Phylogeny Trait3 : Phylogeny Trait1","Phylogeny Trait4 : Phylogeny Trait1","Phylogeny Trait5 : Phylogeny Trait1","Phylogeny Trait6 : Phylogeny Trait1","Phylogeny Trait7 : Phylogeny Trait1","Phylogeny Trait8 : Phylogeny Trait1","Phylogeny Trait9 : Phylogeny Trait1","Residual Trait2 : Residual Trait1","Residual Trait3 : Residual Trait1","Residual Trait4 : Residual Trait1","Residual Trait5 : Residual Trait1","Residual Trait6 : Residual Trait1","Residual Trait7 : Residual Trait1","Residual Trait8 : Residual Trait1","Residual Trait9 : Residual Trait1"),
-  
+  #partial_vcvs = list(c(1:9),c(10:18))    
+  #partial_names = list(c("trait1 phylogeny","trait2 phylogeny","trait3 phylogeny"),c("trait1 residual","trait2 residual","trait3 residual"))
+  #pcor_diffs = c("trait2 phylogeny_trait1 phylogeny vs trait2 residual_trait1 residual")
+
   #Load packages and naming ----
-  pacman::p_load(MCMCglmm,coda,openxlsx,stringdist,kableExtra)
+  pacman::p_load(MCMCglmm,coda,openxlsx,stringdist,kableExtra,corpcor)
 
   #===========================================================
   #Check terms are specified correctly and relabel terms ----
@@ -493,7 +505,9 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
     row_nums = row_nums + dim(randomCorr)[1]+2
   }
   
-  ##Cor_diffs ----
+  #===========================================================
+  #Cor_diffs ----
+  #===========================================================
   #If no cor_diffs then skip this part
   if(is.null(cor_diffs)) {
     return(workbook)
@@ -503,15 +517,108 @@ MCMCglmmProc<-function(model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2v
     corr_comp<-pairwise.diffs(corrs,nF=length(colnames(corrs)))
     
     #Select specified comparisons
-    corr_select = corr_comp %>% dplyr::filter(Fixed_Effects %in% cor_diffs == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC) %>% dplyr::rename("Correlation comparions"="Fixed_Effects")
+    corr_select = corr_comp %>% dplyr::filter(Fixed_Effects %in% cor_diffs == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC) %>% dplyr::rename("Correlation comparisons"="Fixed_Effects")
     
     ##Write data to excel sheet
     writeData(workbook, sheet, corr_select, startCol = 1, startRow = row_nums,headerStyle = hs2)
     conditionalFormatting(workbook, sheet, cols=3, rows=row_nums+4:10000, rule="<0.05", style = bolding)
     row_nums = row_nums + dim(corr_select)[1]+2
   }
-}  
+ 
+  #===========================================================
+  #Partial Correlations ----
+  #===========================================================
+  pacman::p_load(tidyverse)
+
+  if(is.null(partial_vcvs)) {
+    return(workbook)
+  } else  {
+    
+    #Function for calculating partial correlations for each iteration from variance-covariance matrix
+    MCMCpcor = function (VCV, ntraits,trait_names) 
+                  {result = data.frame(iteration = as.numeric(), trait_comb = as.character(), partial_cor = as.numeric())
+                      for (i in 1:dim(VCV)[1]) {
+                          tmp = cor2pcor(matrix(VCV[i, ], ntraits, ntraits)) #Calculate partial correlations
+                          colnames(tmp) = trait_names #Name rows and columns
+                          rownames(tmp) = trait_names
+                          tmp <- data.frame(Row = rownames(tmp)[row(tmp)[lower.tri(tmp, diag = FALSE)]],
+                                            Col = colnames(tmp)[col(tmp)[lower.tri(tmp, diag = FALSE)]],
+                                            Value = tmp[lower.tri(tmp, diag = FALSE)]) #Place results in data frame
+                        tmp <- data.frame(iteration = i,trait_comb = paste(tmp$Row, tmp$Col, sep = "_"), partial_cor = tmp$Value) #Create trait combination names
+                        result = rbind(result, tmp)
+                      }
+      
+                      # transform to wide mcmc object
+                      result = result %>% pivot_wider(id_cols = iteration, names_from = trait_comb, 
+                                                        values_from = partial_cor)
+                      result = as.mcmc(result[, -1]) 
+      
+                      # calculate pMCMC values
+                      ncors<-ifelse(is.null(dim(result)), 1,dim(result)[2])
+                      nits<-ifelse(is.null(dim(result)),length(result), dim(result)[1])
+      
+                      if(ncors >1){
+                        pCor=pmax(0.5/nits, pmin(colSums(result[,1:ncors, drop = FALSE] > 0)/nits, 1 - colSums(result[, 1:ncors, drop = FALSE] > 0)/nits))*2
+                      } else  {
+                        pCor=pmax(0.5/nits, pmin(sum(result[,drop = FALSE] > 0)/nits, 1 - sum(result[, drop = FALSE] > 0)/nits))*2
+                      }
+                      
+                      # summarise mcmc samples
+                      sum_res = data.frame(trait_comb = colnames(result), 
+                                           post_mode_CI = paste(round(posterior.mode(result),dec_PM)," (",round(HPDinterval(result)[,1],dec_PM), ", ",round(HPDinterval(result)[,2],dec_PM),")",sep=""),
+                                           pMCMC =pCor)
+                      
+                    return(list(result,sum_res))
+    }
+    
+    #Create objects to write partial correlations to 
+    pcorrs = mcmc()
+    pcorrs_sum = data.frame("Partial Correlations"=character(),"Posterior Mode (CI)"=as.numeric(),"pMCMC"=as.numeric(), check.names=FALSE)
+    
+    # extract vcvs, calculate partial correlations using function above and combine results from vcvs
+    for(i in 1:length(partial_vcvs)) {
+      # extract covariance matrix
+      vcv = model$VCV[,partial_vcvs[[i]]]
+
+      #calculate partial corrs for each iteration
+      tmp = MCMCpcor(VCV = vcv, ntraits = length(partial_names[[i]]),trait_names = partial_names[[i]])
+      pcorrs =cbind(pcorrs,tmp[[1]])
+      pcorrs_sum = rbind(pcorrs_sum,tmp[[2]])
+      }    
+    pcorrs = mcmc(pcorrs[,-1]) #sort formatting 
+    
+    ##Write data to excel sheet ----
+    writeData(workbook, sheet, pcorrs_sum, startCol = 1, startRow = row_nums,headerStyle = hs2)
+    conditionalFormatting(workbook, sheet, cols=3, rows=row_nums+4:10000, rule="<0.05", style = bolding)
+    row_nums = row_nums + dim(pcorrs_sum)[1]+2
+  }
+  
+  #===========================================================
+  #Partial  Cor_diffs ----
+  #===========================================================
+  #If no cor_diffs then skip this part
+  if(is.null(pcor_diffs)) {
+    return(workbook)
+  } else  {
+    
+    #Calculate differences between partial correlations
+
+    pcorr_comp<-pairwise.diffs(pcorrs,nF=length(colnames(pcorrs)))
+    
+    #Select specified comparisons
+    pcorr_select = pcorr_comp %>% dplyr::filter(Fixed_Effects %in% pcor_diffs == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC) %>% dplyr::rename("Partial correlation comparisons"="Fixed_Effects")
+    
+    ##Write data to excel sheet
+    writeData(workbook, sheet, pcorr_select, startCol = 1, startRow = row_nums,headerStyle = hs2)
+    conditionalFormatting(workbook, sheet, cols=3, rows=row_nums+4:10000, rule="<0.05", style = bolding)
+    row_nums = row_nums + dim(pcorr_select)[1]+2
+  }
+  }  
+
+  
+  #===========================================================
   #Some final formatting ----
+  #============================================================
   for(i in 1:length(sheets(workbook))){
     setColWidths(workbook, sheet = i, cols = 1:20, widths = "auto")
   }
@@ -590,7 +697,7 @@ md <- function(data,stats=FALSE) {
         row_spec(grep("^Fixed Effect Comparisons",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")|>
         row_spec(grep("^Random",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")|>
         row_spec(grep("^Correlations",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")|>
-        row_spec(grep("^Correlation comparions",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |>
+        row_spec(grep("^Correlation comparisons",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |>
         row_spec(nrow(data), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") |>
         column_spec(column=3, bold =rows_bold) |> 
         row_spec(1:nrow(data), extra_css = "height: 1em; white-space: nowrap;") |> 
@@ -634,7 +741,7 @@ md <- function(data,stats=FALSE) {
                                   hline(i = corr_row-1, part = "body", border = b) |> 
                                   hline(i = corr_row, part = "body", border = b)
     # Correlation comparisons
-    corrcomp_row <- grep("^Correlation comparions", data[,1])
+    corrcomp_row <- grep("^Correlation comparisons", data[,1])
     ft  <- ft |> bold(i = corr_row, part = "body", bold = TRUE) |> 
                                   bg(i = corr_row, part = "body", bg   = "#E7E5E5") |> 
                                   hline(i = corr_row-1, part = "body", border = b) |> 
@@ -695,7 +802,7 @@ md_table = function(df){
     row_spec(grep("^Fixed Effect Comparisons",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
     row_spec(grep("^Random",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
     row_spec(grep("^Correlations",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
-    row_spec(grep("^Correlation comparions",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") %>%    
+    row_spec(grep("^Correlation comparisons",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") %>%    
     row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") %>%    
     column_spec(column=3, bold =rows_bold)}
 
@@ -708,5 +815,5 @@ md_table2 = function(df){pacman::p_load(kableExtra)
     row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
     row_spec(grep("^Random",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
     row_spec(grep("^Correlations",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
-    row_spec(grep("^Correlation comparions",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
+    row_spec(grep("^Correlation comparisons",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
     row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px")}

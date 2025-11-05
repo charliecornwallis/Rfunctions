@@ -69,7 +69,7 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
   #randomcovar_names =c("Phylogeny Trait2 : Phylogeny Trait1","Phylogeny Trait3 : Phylogeny Trait1","Phylogeny Trait4 : Phylogeny Trait1","Phylogeny Trait5 : Phylogeny Trait1","Phylogeny Trait6 : Phylogeny Trait1","Phylogeny Trait7 : Phylogeny Trait1","Phylogeny Trait8 : Phylogeny Trait1","Phylogeny Trait9 : Phylogeny Trait1","Residual Trait2 : Residual Trait1","Residual Trait3 : Residual Trait1","Residual Trait4 : Residual Trait1","Residual Trait5 : Residual Trait1","Residual Trait6 : Residual Trait1","Residual Trait7 : Residual Trait1","Residual Trait8 : Residual Trait1","Residual Trait9 : Residual Trait1"),
   #partial_vcvs = list(c(1:9),c(10:18))    
   #partial_names = list(c("trait1 phylogeny","trait2 phylogeny","trait3 phylogeny"),c("trait1 residual","trait2 residual","trait3 residual"))
-  #pcor_diffs = c("trait2 phylogeny_trait1 phylogeny vs trait2 residual_trait1 residual")
+  #pcor_diffs = c("trait2 phylogeny : trait1 phylogeny vs trait2 residual : trait1 residual")
 
   #Load packages and naming ----
   pacman::p_load(MCMCglmm,coda,openxlsx,stringdist,kableExtra,corpcor)
@@ -510,7 +510,6 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
   #===========================================================
   #If no cor_diffs then skip this part
   if(is.null(cor_diffs)) {
-    return(workbook)
   } else  {
     #Calculate differences between correlations
     colnames(corrs)=colnames(covar_terms)
@@ -531,7 +530,6 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
   pacman::p_load(tidyverse)
 
   if(is.null(partial_vcvs)) {
-    return(workbook)
   } else  {
     
     #Function for calculating partial correlations for each iteration from variance-covariance matrix
@@ -600,7 +598,6 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
 #===========================================================
 #If no cor_diffs then skip this part
 if(is.null(pcor_diffs)) {
-  return(workbook)
 } else  {
   
   #Calculate differences between partial correlations

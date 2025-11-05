@@ -166,7 +166,7 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
     result<-as.mcmc(result)
     fe2=paste(round(posterior.mode(result),dec_PM)," (",round(HPDinterval(result)[,1],dec_PM), ", ",round(HPDinterval(result)[,2],dec_PM),")",sep="")
     fe2_p=pmax(0.5/dim(result)[1], pmin(colSums(result[,1:ndiffs, drop = FALSE] > 0)/dim(result)[1], 1 - colSums(result[, 1:ndiffs, drop = FALSE] > 0)/dim(result)[1]))*2
-    fe2=data.frame(Fixed_Effects=colnames(result),Estimates=fe2, pMCMC=round(as.numeric(fe2_p),3), check.names=FALSE)
+    fe2=data.frame(Fixed_Effects=colnames(result),Estimates=fe2, pMCMC=round(as.numeric(fe2_p),5), check.names=FALSE)
     return(fe2)
   } 
   }
@@ -234,7 +234,7 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
       result<-as.mcmc(result)
       fe2=paste(round(posterior.mode(result),dec_PM)," (",round(HPDinterval(result)[,1],dec_PM), ", ",round(HPDinterval(result)[,2],dec_PM),")",sep="")
       fe2_p=pmax(0.5/dim(result)[1], pmin(colSums(result[,1:ndiffs, drop = FALSE] > 0)/dim(result)[1], 1 - colSums(result[, 1:ndiffs, drop = FALSE] > 0)/dim(result)[1]))*2
-      fe2=data.frame(Fixed_Effects=colnames(result),Estimates=fe2, pMCMC=round(as.numeric(fe2_p),3), check.names=FALSE)
+      fe2=data.frame(Fixed_Effects=colnames(result),Estimates=fe2, pMCMC=round(as.numeric(fe2_p),4), check.names=FALSE)
       return(fe2)
     } 
     }
@@ -250,7 +250,7 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
   fixedeff<-data.frame("Fixed Effects"=fixedeff$Fixed_Effects,"Posterior Mode (CI)"=fixedeff$Estimates,"pMCMC"=fixedeff$pMCMC,check.names=FALSE)
   #Fixed differences
   fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
-  fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
+  fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=as.numeric(fixeddiff$pMCMC),check.names=FALSE)
   
   #===========================================================
   #Excel output: fixed effects ----
@@ -566,7 +566,7 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
                       # summarise mcmc samples
                       sum_res = data.frame(trait_comb = colnames(result), 
                                            post_mode_CI = paste(round(posterior.mode(result),dec_PM)," (",round(HPDinterval(result)[,1],dec_PM), ", ",round(HPDinterval(result)[,2],dec_PM),")",sep=""),
-                                           pMCMC =round(pCor,dec_PM))
+                                           pMCMC =round(pCor,4))
                       
                     return(list(result,sum_res))
                     }

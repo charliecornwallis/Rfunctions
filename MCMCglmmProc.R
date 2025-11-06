@@ -11,8 +11,14 @@
 # variances=
 # covariances =
 # randomvar_names= 
-# randomcovar_names =
+# cor_vcvs =
+# cor_names =
+# cor_select = NULL
 # cor_diffs = 
+# partial_vcvs = NULL 
+# partial_names = NULL
+# partial_select = NULL
+# partial_diffs = NULL
 # padding=3
 # ginv="animal"
 # fixed_diffinc="all"
@@ -23,7 +29,6 @@
 # pvalues="exclude"
 # S2var=0
 # cor_diff=NULL
-# 
 
 #Function ----
 
@@ -31,48 +36,49 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
                        model=NULL,responses=NULL,dist_var=NULL,ginv="animal",S2var=0,#specify model details
                        fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL, pvalues="include", #fixed effect specifications
                        Include_random = "no", variances=NULL,randomvar_names=NULL, #random effect specifications
-                       covariances=NULL,randomcovar_names=NULL,cor_diffs=NULL, #covariance specifications
-                      partial_vcvs = NULL, partial_names = NULL, pcor_diffs = NULL) #partial correlation specifications
+                       cor_vcvs=NULL,cor_names=NULL,cor_select=NULL, cor_diffs=NULL,#covariance specifications
+                       partial_vcvs = NULL, partial_names = NULL, partial_select=NULL, partial_diffs = NULL) #partial correlation specifications
 { 
   #Explanation of terms ----
   #model = MCMCglmm model
-  #response = list of responses (e.g. c(trait1,trait2))
-  #dist_var = distribution variance associated with link function: e.g."gaussian" = 0, "log" = log(1 + log(exp(intercept + 0.5*sumRE)), "logit" = pi^2/3, "probit" = 1. This is a complicated issue and should be given careful thought: see Nakagawa et al 2017
+  #responses = specify response variables can take multiple values for multi response
+  #dist_var = distribution variance associated with link function: e.g."gaussian" = 0, "log" = log(1 + log(exp(intercept + 0.5*sumRE)), "logit" = pi^2/3, "probit" = 1. This is a complicated issue and should be given careful thought: see Nakagawa et al 2017. #For Multi-response models can provide a list of dist_var and S2var corresponding to each response trait
   #S2var = sampling variance if known - useful for meta-analyses
-  #For Multi-response models can provide a list of dist_var and S2var corresponding to each response trait
   #start_row=starting row of workbook to add data to if NULL put data in first empty row 
   #workbook = adds data if specified, otherwise will make a new e.g. Results
   #create_sheet = should a new sheet be created e.g."yes" vs "no"
   #sheet= name of sheet "Analysis 1"
   #title = Title of table in e.g. "Table 1"
+  #Padding = space between tables when outputting multiple models to same sheet
+  #dec_PM = number of decimals given for posterior mode and CIs of fixed and random effects
+  #pvalues = exclusion of pMCMC values for fixed effects - "exclude" = exclude all, "include" = include all or index pvalues to be excluded e.g. "c(1,3)" removes 1st and 3rd, c(1:7) removes 1 to 7. Note pMCMC will still be calculated for fixed effect comparisons.
   #fixed_names = what you want fixed effects to be called e.g c("Intercept","Season length")
   #fixed_diffinc = differences between fixed effects to be included in output. Terms that come first in fixed_names have to come first in the comparison.
   #fixed_diff_diffs = calculates differences between differences e.g. c("effect1 vs effect2 - effect3 vs effect4"). Must exactly match names of fixed effects and be separate by " - "
   #variances = names of variance terms in VCV object either indices or written. Must be as they appear in the model object not the renamed. If left as NULL then taken from the model object.
-  #covariances = names of covariance terms in VCV object either indices or written. Must be as they appear in the model object not the renamed. If left as NULL then they are not outputted.
   #randomvar_names = what you want random effect variances to be called. Note reserved term animal is renamed to phylogeny
-  #randomcovar_names = what you want random effect covariances to be called. Note for correlations to be calculated this has to be same as variance1 : variance2
   #Include_random = should random effects be included in output
-  #Padding = space between tables when outputting multiple models to same sheet
-  #dec_PM = number of decimals given for posterior mode and CIs of fixed and random effects
-  #responses = specify response variables can take multiple values for multi response
-  #pvalues = exclusion of pMCMC values for fixed effects - "exclude" = exclude all, "include" = include all or index pvalues to be excluded e.g. "c(1,3)" removes 1st and 3rd, c(1:7) removes 1 to 7. Note pMCMC will still be calculated for fixed effect comparisons.
+  #cor_vcvs = specify the variance covariance (vcv) matrices that you want to calculate correlations for as a list [e.g. list(c(1:9),c(10:18)) ]   
+  #cor_names = name the traits for each set of correlations as a list [e.g. list(c("trait1 phylogeny","trait2 phylogeny","trait3 phylogeny"),c("trait1 residual","trait2 residual","trait3 residual")) ]
+  #cor_select = names of the correlations that you want presented in tables
   #cor_diff = calculates differences between correlations. Should be specified in the same way as fixed_diffs e.g. c("cor1 vs cor2","cor1 vs cor3"...) 
   #partial_vcvs = specify the variance covariance (vcv) matrices that you want to calculate partial correlations for as a list [e.g. list(c(1:9),c(10:18)) ]   
   #partial_names = name the traits for each set of partial correlations as a list [e.g. list(c("trait1 phylogeny","trait2 phylogeny","trait3 phylogeny"),c("trait1 residual","trait2 residual","trait3 residual")) ]
-  #pcor_diffs = specify the partial correlations that you want to compare. Names must match the partial names separated by vs [e.g. c("trait2 phylogeny_trait1 phylogeny vs trait2 residual_trait1 residual") ]
+  #partial_select = names of the partial correlations that you want presented in tables
+  #partial_diffs = specify the partial correlations that you want to compare. Names must match the partial names separated by vs [e.g. c("trait2 phylogeny_trait1 phylogeny vs trait2 residual_trait1 residual") ]
 
   #Naming aid ----
   #variances=c("trait1:trait1.animal","trait2:trait2.animal","trait3:trait3.animal","trait4:trait4.animal","trait5:trait5.animal","trait6:trait6.animal","trait7:trait7.animal","trait8:trait8.animal","trait9:trait9.animal","trait1:trait1.units","trait2:trait2.units","trait3:trait3.units","trait4:trait4.units","trait5:trait5.units","trait6:trait6.units","trait7:trait7.units","trait8:trait8.units","trait9:trait9.units"),
-  #covariances =c("trait2:trait1.animal","trait3:trait1.animal","trait4:trait1.animal","trait5:trait1.animal","trait6:trait1.animal","trait7:trait1.animal","trait8:trait1.animal","trait9:trait1.animal","trait2:trait1.units","trait3:trait1.units","trait4:trait1.units","trait5:trait1.units","trait6:trait1.units","trait7:trait1.units","trait8:trait1.units","trait9:trait1.units"),
   #randomvar_names=c("Phylogeny Trait1","Phylogeny Trait2","Phylogeny Trait3","Phylogeny Trait4","Phylogeny Trait5","Phylogeny Trait6","Phylogeny Trait7", "Phylogeny Trait8","Phylogeny Trait9","Residual Trait1","Residual Trait2","Residual Trait3","Residual Trait4","Residual Trait5","Residual Trait6","Residual Trait7","Residual Trait8","Residual Trait9"),
-  #randomcovar_names =c("Phylogeny Trait2 : Phylogeny Trait1","Phylogeny Trait3 : Phylogeny Trait1","Phylogeny Trait4 : Phylogeny Trait1","Phylogeny Trait5 : Phylogeny Trait1","Phylogeny Trait6 : Phylogeny Trait1","Phylogeny Trait7 : Phylogeny Trait1","Phylogeny Trait8 : Phylogeny Trait1","Phylogeny Trait9 : Phylogeny Trait1","Residual Trait2 : Residual Trait1","Residual Trait3 : Residual Trait1","Residual Trait4 : Residual Trait1","Residual Trait5 : Residual Trait1","Residual Trait6 : Residual Trait1","Residual Trait7 : Residual Trait1","Residual Trait8 : Residual Trait1","Residual Trait9 : Residual Trait1"),
+  #cor_vcvs = list(c(1:9),c(10:18))    
+  #cor_names = list(c("trait1 phylogeny","trait2 phylogeny","trait3 phylogeny"),c("trait1 residual","trait2 residual","trait3 residual"))
+  #cor_diffs = c("trait2 phylogeny : trait1 phylogeny vs trait2 residual : trait1 residual")
   #partial_vcvs = list(c(1:9),c(10:18))    
   #partial_names = list(c("trait1 phylogeny","trait2 phylogeny","trait3 phylogeny"),c("trait1 residual","trait2 residual","trait3 residual"))
-  #pcor_diffs = c("trait2 phylogeny : trait1 phylogeny vs trait2 residual : trait1 residual")
+  #partial_diffs = c("trait2 phylogeny : trait1 phylogeny vs trait2 residual : trait1 residual")
 
   #Load packages and naming ----
-  pacman::p_load(MCMCglmm,coda,openxlsx,stringdist,kableExtra,corpcor)
+  pacman::p_load(MCMCglmm,coda,openxlsx,stringdist,kableExtra,corpcor,tidyverse)
 
   #===========================================================
   #Check terms are specified correctly and relabel terms ----
@@ -309,27 +315,22 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
     randomVar<-data.frame("Random Effects"="Residual","Posterior Mode (CI)"=c(rand1),"I2 % (CI)"=100, check.names=FALSE)
     
     } else  {  
+ 
+  #warn if variances are not specified
+  if (is.null(variances)) {
+    stop("variances must be specified either as indices of VCV or column names of VCV")
+  } else {
+  }
+
+  #if numeric string submitted then pull out names, otherwise leave as is
+  if(is.numeric(variances)) {
+    variances = colnames(model$VCV)[variances]
+    } else  {
+  }  
   
   #Rename phylogeny or pedigree term (ginv=) to animal
   colnames(model$VCV) <- sub(ginv, "animal", colnames(model$VCV))
   variances <- sub(ginv, "animal", variances)
-  
-  #if variances are not specified make them the same as those in the model
-  if(is.null(variances)) {
-    
-    #Multi-response models
-    if(length(responses)>1){
-      var_ids<-seq(from=1,to=length(responses)^2,by=length(responses)+1)#indices of variances
-      for(i in 1:length(model$Random$nfl)+1){ #The indices corresponding to each response variable
-        var_ids<-c(var_ids,var_ids+max(var_ids))
-      }
-      variances<-variances[var_ids]#Pick out variances
-    } else  {
-      #if single response model then all random effects assumed to be variances. Might not always be the case (e.g. for random regression ) in which case variances and covariance need to be specified
-      variances<-colnames(model$VCV)
-    } 
-  } else  {
-  }
   
   ##Separate out variance and covariance terms ----
   var_terms<-model$VCV[,variances]
@@ -431,10 +432,9 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
   } else  {
     randomVar<-data.frame("Random Effects"=c(colnames(var_terms),names(icc_S2var)),"Posterior Mode (CI)"=c(rand1,round(S2var,dec_PM)),"I2 % (CI)"=c(icc1,icc_S2var), check.names=FALSE)
   }
-  
+    
   }
   
-
   #===========================================================
   #Excel output: random effects ----
   #===========================================================
@@ -446,75 +446,88 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
   #===========================================================
   #Correlations ----
   #===========================================================
-  if(Include_random == "no") {
-    #If no random effects are estimated then skip correlation estimation
+  if(is.null(cor_vcvs)) {
   } else  {
     
-  #If no covariances skip this part
-  if(is.null(randomcovar_names)) {
-  } else  {
-    #Covariance identification if not specified
-    if(is.null(covariances)) {
-      covariances<-colnames(model$VCV)[colnames(model$VCV) != variances]
-    } else  {
-      covariances<-covariances
-    }
-    #rename phylogeny term to animal
-    covariances<-sub(ginv, "animal", covariances)
-    covar_terms<-as.mcmc(as.matrix((model$VCV[,covariances])))
-    colnames(covar_terms)<-randomcovar_names
+    #Function for calculating partial correlations for each iteration from variance-covariance matrix
+    MCMCcor = function (VCV, ntraits,trait_names) 
+                  {result = data.frame(iteration = as.numeric(), trait_comb = as.character(), cor = as.numeric())
+                      for (i in 1:dim(VCV)[1]) {
+                          tmp = cov2cor(matrix(VCV[i, ], ntraits, ntraits)) #Calculate partial correlations
+                          colnames(tmp) = trait_names #Name rows and columns
+                          rownames(tmp) = trait_names
+                          tmp <- data.frame(Row = rownames(tmp)[row(tmp)[lower.tri(tmp, diag = FALSE)]],
+                                            Col = colnames(tmp)[col(tmp)[lower.tri(tmp, diag = FALSE)]],
+                                            Value = tmp[lower.tri(tmp, diag = FALSE)]) #Place results in data frame
+                        tmp <- data.frame(iteration = i,trait_comb = paste(tmp$Row, tmp$Col, sep = " : "), cor = tmp$Value) #Create trait combination names
+                        result = rbind(result, tmp)
+                      }
+      
+                      # transform to wide mcmc object
+                      result = result %>% pivot_wider(id_cols = iteration, names_from = trait_comb, 
+                                                        values_from = cor)
+                      result = as.mcmc(result[, -1]) 
+      
+                      # calculate pMCMC values
+                      ncors<-ifelse(is.null(dim(result)), 1,dim(result)[2])
+                      nits<-ifelse(is.null(dim(result)),length(result), dim(result)[1])
+      
+                      if(ncors >1){
+                        cor=pmax(0.5/nits, pmin(colSums(result[,1:ncors, drop = FALSE] > 0)/nits, 1 - colSums(result[, 1:ncors, drop = FALSE] > 0)/nits))*2
+                      } else  {
+                        cor=pmax(0.5/nits, pmin(sum(result[,drop = FALSE] > 0)/nits, 1 - sum(result[, drop = FALSE] > 0)/nits))*2
+                      }
+                      
+                      # summarise mcmc samples
+                      sum_res = data.frame(trait_comb = colnames(result), 
+                                           post_mode_CI = paste(round(posterior.mode(result),dec_PM)," (",round(HPDinterval(result)[,1],dec_PM), ", ",round(HPDinterval(result)[,2],dec_PM),")",sep=""),
+                                           pMCMC =round(cor,4))
+                      
+                    return(list(result,sum_res))
+                    }
     
-    #rename covariances effects
-    if(is.null(randomcovar_names)) {
-      colnames(covar_terms)<- colnames(covar_terms)
-    } else  {
-      colnames(covar_terms)<-randomcovar_names
-    }
+    #Create objects to write correlations to 
+    corrs = mcmc()
+    corrs_sum = data.frame()
     
-    #Need to pull out variances relating to covariances and cycle through covariance terms to calculate correlations
-    corrs=matrix(0, nrow = dim(covar_terms)[1], ncol = 1)
-    for(i in 1:dim(covar_terms)[2]) {
-      #covar
-      cov<-covar_terms[,i]
-      #find variances 
-      cov_vars=unlist(strsplit(colnames(covar_terms)[i], ":"))
-      #remove punctuation and find matches
-      var_names<-amatch(gsub("[[:punct:][:blank:]]+", "", cov_vars),gsub("[[:punct:][:blank:]]+", "", colnames(var_terms)),maxDist=2) 
-      #Check variances are extracted correctly
-      if(sum(is.na(var_names))>0) stop("covariance term needs to match variances separated by :")
-      vars<-var_terms[,var_names] 
-      #Calculate corrs
-      tmpcor<-cov/sqrt(vars[,1]*vars[,2])
-      corrs<-cbind(corrs,tmpcor)
-    }
-    corrs<-as.mcmc(corrs[,-1])
-    #Cor Summaries
-    cor1=paste(round(posterior.mode(corrs),dec_PM)," (",round(HPDinterval(corrs)[,1],dec_PM), ", ",round(HPDinterval(corrs)[,2],dec_PM),")",sep="")
-    ncors<-ifelse(is.null(dim(corrs)), 1,dim(corrs)[2])
-    nits<-ifelse(is.null(dim(corrs)),length(corrs), dim(corrs)[1])
-    if(ncors >1){
-      pCor=pmax(0.5/nits, pmin(colSums(corrs[,1:ncors, drop = FALSE] > 0)/nits, 1 - colSums(corrs[, 1:ncors, drop = FALSE] > 0)/nits))*2
-    } else  {
-      pCor=pmax(0.5/nits, pmin(sum(corrs[,drop = FALSE] > 0)/nits, 1 - sum(corrs[, drop = FALSE] > 0)/nits))*2
-    }
-    randomCorr<-data.frame("Correlations"=colnames(covar_terms),"Posterior Mode (CI)"=cor1,"pMCMC"=round(as.numeric(pCor),3), check.names=FALSE)
+    # extract vcvs, calculate correlations using function above and combine results from vcvs
+    for(i in 1:length(cor_vcvs)) {
+      # extract covariance matrix
+      vcv = model$VCV[,cor_vcvs[[i]]]
+
+      #calculate corrs for each iteration
+      tmp = MCMCcor(VCV = vcv, ntraits = length(cor_names[[i]]),trait_names = cor_names[[i]])
+      corrs =cbind(corrs,tmp[[1]])
+      corrs_sum = rbind(corrs_sum,tmp[[2]])
+      }
     
+    #sort formatting 
+    corrs = mcmc(corrs[,-1]) 
+    corrs_sum = data.frame("Correlations"=corrs_sum$trait_comb,"Posterior Mode (CI)"=corrs_sum$post_mode_CI,"pMCMC"=corrs_sum$pMCMC, check.names=FALSE)
+    
+    #Select specified comparisons
+    if(is.null(cor_select)) {
+      corrs_sum
+      } else  {
+    corrs_sum = corrs_sum %>% dplyr::filter(Correlations %in% cor_select == T) 
+    }
+
     ##Write data to excel sheet ----
-    writeData(workbook, sheet, randomCorr, startCol = 1, startRow = row_nums,headerStyle = hs2)
+    writeData(workbook, sheet, corrs_sum, startCol = 1, startRow = row_nums,headerStyle = hs2)
     conditionalFormatting(workbook, sheet, cols=3, rows=row_nums+4:10000, rule="<0.05", style = bolding)
-    row_nums = row_nums + dim(randomCorr)[1]+2
+    row_nums = row_nums + dim(corrs_sum)[1]+2
   }
-  
+     
   #===========================================================
   #Cor_diffs ----
   #===========================================================
   #If no cor_diffs then skip this part
   if(is.null(cor_diffs)) {
   } else  {
+
     #Calculate differences between correlations
-    colnames(corrs)=colnames(covar_terms)
     corr_comp<-pairwise.diffs(corrs,nF=length(colnames(corrs)))
-    
+
     #Select specified comparisons
     corr_select = corr_comp %>% dplyr::filter(Fixed_Effects %in% cor_diffs == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC) %>% dplyr::rename("Correlation Comparisons"="Fixed_Effects", "Posterior Mode (CI)"="Estimates")
     
@@ -527,8 +540,6 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
   #===========================================================
   #Partial Correlations ----
   #===========================================================
-  pacman::p_load(tidyverse)
-
   if(is.null(partial_vcvs)) {
   } else  {
     
@@ -582,11 +593,19 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
       tmp = MCMCpcor(VCV = vcv, ntraits = length(partial_names[[i]]),trait_names = partial_names[[i]])
       pcorrs =cbind(pcorrs,tmp[[1]])
       pcorrs_sum = rbind(pcorrs_sum,tmp[[2]])
-      }    
+      }
+    
     #sort formatting 
     pcorrs = mcmc(pcorrs[,-1]) 
     pcorrs_sum = data.frame("Partial Correlations"=pcorrs_sum$trait_comb,"Posterior Mode (CI)"=pcorrs_sum$post_mode_CI,"pMCMC"=pcorrs_sum$pMCMC, check.names=FALSE)
     
+   #Select specified comparisons
+    if(is.null(partial_select)) {
+      pcorrs_sum
+      } else  {
+      pcorrs_sum = pcorrs_sum %>% dplyr::filter(`Partial Correlations` %in% partial_select == T) 
+    }
+
     ##Write data to excel sheet ----
     writeData(workbook, sheet, pcorrs_sum, startCol = 1, startRow = row_nums,headerStyle = hs2)
     conditionalFormatting(workbook, sheet, cols=3, rows=row_nums+4:10000, rule="<0.05", style = bolding)
@@ -597,21 +616,19 @@ MCMCglmmProc<-function(start_row=NULL,workbook=NULL, create_sheet="yes",sheet="s
 #Partial  Cor_diffs ----
 #===========================================================
 #If no cor_diffs then skip this part
-if(is.null(pcor_diffs)) {
+if(is.null(partial_diffs)) {
 } else  {
   
   #Calculate differences between partial correlations
-
   pcorr_comp<-pairwise.diffs(pcorrs,nF=length(colnames(pcorrs)))
   
   #Select specified comparisons
-  pcorr_select = pcorr_comp %>% dplyr::filter(Fixed_Effects %in% pcor_diffs == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC) %>% dplyr::rename("Partial Correlation Comparisons"="Fixed_Effects","Posterior Mode (CI)"="Estimates")
+  pcorr_select = pcorr_comp %>% dplyr::filter(Fixed_Effects %in% partial_diffs == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC) %>% dplyr::rename("Partial Correlation Comparisons"="Fixed_Effects","Posterior Mode (CI)"="Estimates")
   
   ##Write data to excel sheet
   writeData(workbook, sheet, pcorr_select, startCol = 1, startRow = row_nums,headerStyle = hs2)
   conditionalFormatting(workbook, sheet, cols=3, rows=row_nums+4:10000, rule="<0.05", style = bolding)
   row_nums = row_nums + dim(pcorr_select)[1]+2
-}
 }  
 
 #===========================================================

@@ -357,8 +357,8 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   hs1 <- createStyle(fgFill = "white", halign = "LEFT", textDecoration = "bold",border = "TopBottom")
   hs2 <- createStyle(halign = "LEFT",border = "TopBottom",textDecoration = "bold")
   #table title
-  header=data.frame(col1=c(""),col2=c(""),col3=c(""),col4=c(""),col5=c(""),col6=c(""),col7=c(""),col8=c(""),col9=c(""))
-  colnames(header)<-c(title,"","","","","","","","")
+  header=data.frame(col1=c(""),col2=c(""),col3=c(""))
+  colnames(header)<-c(title,"","")
   writeData(workbook, sheet, header, startCol = 1, startRow = start_row,headerStyle = hs1)
   
   #Fixed effects
@@ -404,7 +404,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     row_nums = row_nums + dim(rho)[1]+2
     }
   
-  writeData(workbook, sheet, "Fit statistics",startCol = 1, startRow = row_nums,headerStyle = hs2)
+  writeData(workbook, sheet, "Fit Statistics",startCol = 1, startRow = row_nums,headerStyle = hs2)
   addStyle(workbook, sheet, style = hs2, rows = row_nums, cols = 1:3, gridExpand = TRUE)
 
   writeData(workbook, sheet, model_fit, startCol = 1, startRow = row_nums+1,headerStyle = hs2)
@@ -743,7 +743,52 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     }
     
     #****************************************************
-    #% variation of explained by fixed and random effects for each species  ----
+    ##Excel output: fixed and random effects for species ----
+    #****************************************************
+    #Fixed effects
+    fixedeff <- fixed[!grepl(" vs ",fixed$Fixed_Effects),]
+    fixedeff<-data.frame("Fixed Effects"=fixedeff$Fixed_Effects,"Posterior Mode (CI)"=fixedeff$Estimates,"pMCMC"=fixedeff$pMCMC,check.names=FALSE)
+    #Fixed differences
+    fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
+    fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
+    
+    #Create new sheet 
+    sheet3 = paste(sheet,"species",sep="_")
+    start_row = 1
+    addWorksheet(workbook, sheet3)
+    
+    #table title
+    header=data.frame(col1=c(""),col2=c(""),col3=c(""))
+    colnames(header)<-c(paste(title,": species estimates",sep=" "),"","")
+
+    writeData(workbook, sheet3, header, startCol = 1, startRow = start_row,headerStyle = hs1)
+
+    #Fixed effects
+    writeData(workbook, sheet3, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
+    row_nums = start_row+dim(header)[1]+dim(fixedeff)[1]+2
+    
+    #Remove column headings if deleting fixed effects as it will be assessing higher order interactions where column names are not needed
+    if(any(fixed_diffinc_species == "none")) { #Do not write fixed_diffinc_species if "none"
+      } else  {
+      writeData(workbook, sheet3, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
+      row_nums = row_nums + dim(fixeddiff)[1] + 2
+        }
+    
+    #Random effects: variances
+
+    #Should they be outputted or not
+    if(Include_random_species == "yes") {
+      writeData(workbook, sheet3, randomVarspp, startCol = 1, startRow = row_nums,headerStyle = hs2)
+      row_nums = row_nums + dim(randomVarspp)[1]+2
+    } else  {
+    }
+
+    #Bold pMCMC values less than 0.05
+    bolding<-createStyle(textDecoration="bold")
+    conditionalFormatting(workbook, sheet3, cols=3, rows=1:10000, rule="<0.05", style = bolding)
+    
+    #****************************************************
+    #Variance Partitioning (% variation) of explained by fixed and random effects for each species  ----
     #****************************************************
     if(VP_species == "include") {
       VP = as.data.frame(suppressWarnings(computeVariancePartitioning(model)$vals))
@@ -759,67 +804,34 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #****************************************************
     # To assess model fit in terms of $R^2$, we apply the `evaluateModelFit` function to the posterior predictive distribution computed by the function `computePredictedValues`.
     model_preds = computePredictedValues(model)
-    model_fit = as.data.frame(evaluateModelFit(model, predY=model_preds))
+    model_fit_spp = as.data.frame(evaluateModelFit(model, predY=model_preds))
     
     #Round fit stats
-    model_fit = model_fit %>% mutate(across(everything(), ~round(., 2)))
-    model_fit = data.frame(Species=model$spNames,model_fit)
+    model_fit_spp = model_fit_spp %>% mutate(across(everything(), ~round(., 2)))
+    model_fit_spp = data.frame(Species=model$spNames,model_fit_spp)
     
     #****************************************************
-    ##Excel output: fixed and random effects ----
+    ##Excel output: variance partitioning for species ----
     #****************************************************
-    #Fixed effects
-    fixedeff <- fixed[!grepl(" vs ",fixed$Fixed_Effects),]
-    fixedeff<-data.frame("Fixed Effects"=fixedeff$Fixed_Effects,"Posterior Mode (CI)"=fixedeff$Estimates,"pMCMC"=fixedeff$pMCMC,check.names=FALSE)
-    #Fixed differences
-    fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
-    fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
-    
     #Create new sheet 
-    sheet3 = paste(sheet,"species",sep="_")
+    sheet4 = paste(sheet,"species_VP",sep="_")
     start_row = 1
-    addWorksheet(workbook, sheet3)
-    
-    #
-    header=data.frame(col1=c(""),col2=c(""),col3=c(""),col4=c(""),col5=c(""),col6=c(""),col7=c(""),col8=c(""),col9=c(""))
-    colnames(header)<-c(paste(title,": species estimates",sep=" "),"","","","","","","","")
+    addWorksheet(workbook, sheet4)
     
     #table title
-    writeData(workbook, sheet3, header, startCol = 1, startRow = start_row,headerStyle = hs1)
-
-    #Fixed effects
-    writeData(workbook, sheet3, fixedeff, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
-    row_nums = start_row+dim(header)[1]+dim(fixedeff)[1]+2
-    
-    #Remove column headings if deleting fixed effects as it will be assessing higher order interactions where column names are not needed
-    if(any(fixed_diffinc_species == "none")) { #Do not write fixed_diffinc_species if "none"
-      } else  {
-      writeData(workbook, sheet3, fixeddiff, startCol = 1, startRow = start_row+dim(header)[1] +dim(fixedeff)[1]+1,headerStyle = hs2)
-      row_nums = row_nums + dim(fixeddiff)[1] + 2
-        }
-    
-    #Bold pMCMC values less than 0.05
-    bolding<-createStyle(textDecoration="bold")
-    conditionalFormatting(workbook, sheet3, cols=3, rows=1:10000, rule="<0.05", style = bolding)
-    
-    #Random effects: variances
-    #Should they be outputted or not
-    if(Include_random_species == "yes") {
-      writeData(workbook, sheet3, randomVarspp, startCol = 1, startRow = row_nums,headerStyle = hs2)
-      row_nums = row_nums + dim(randomVarspp)[1]+2
-    } else  {
-    }
+    header=data.frame(col1=c(""),col2=c(""),col3=c(""))
+    colnames(header)<-c(paste(title,": species variances",sep=" "),"","")
     
     if(VP_species == "include") {
-      writeData(workbook, sheet3, VP, startCol = 1, startRow = row_nums,headerStyle = hs2)
+      writeData(workbook, sheet4, VP, startCol = 1, startRow = row_nums,headerStyle = hs2)
       row_nums = row_nums + dim(VP)[1]+2
       } else  {
     }
     
-    writeData(workbook, sheet3, "Fit statistics", startCol = 1:3, startRow = row_nums,headerStyle = hs2)
-    addStyle(workbook, sheet3, style = hs2, rows = row_nums, cols = 1, gridExpand = TRUE)
+    writeData(workbook, sheet4, "Fit Statistics", startCol = 1:3, startRow = row_nums,headerStyle = hs2)
+    addStyle(workbook, sheet4, style = hs2, rows = row_nums, cols = 1, gridExpand = TRUE)
 
-    writeData(workbook, sheet3, model_fit, startCol = 1, startRow = row_nums+2,headerStyle = hs2)
+    writeData(workbook, sheet4, model_fit_spp, startCol = 1, startRow = row_nums+2,headerStyle = hs2)
     return(workbook)
     
     #If species estimate != "include" then just returns a workbook with estimates averaged across species
@@ -837,8 +849,138 @@ xl_2_df = function(xltab,sheet=NULL){
   return(df)
 }
 
+#===========================================================
+#function for df to md table that can handle html and other formats e.g. word ----
+#===========================================================
+hmsc_md <- function(data,stats=FALSE) {
+  pacman::p_load(flextable,officer)
+
+##Output if presenting mixed model stats: bolding significant values and highlighting headings
+  if(stats == TRUE){
+        #bold rows if less than 0.05 excluding cells with brackets which will be random effect
+        rows_bold = data |> mutate(signif = !grepl("\\(", pMCMC) & pMCMC < 0.05) |> pull(signif)
+  } else {
+    #Other tables 
+  } 
+  
+  #Output if html format
+  if (knitr::is_html_output()) {
+  
+  if(stats == TRUE){
+    pacman::p_load(kableExtra)
+      kbl(data, align = "l", digits = 3) |>
+        kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11) |>
+        row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
+        row_spec(grep("^Fixed Effect",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
+        row_spec(grep("^Trait Effects",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
+        row_spec(grep("^Random Effects",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
+        row_spec(grep("^Variance Partitioning",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
+        row_spec(grep("^Phylogenetic Effects",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
+        row_spec(grep("^Fit Statistics",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
+        row_spec(nrow(data), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") |> 
+        column_spec(column=3, bold =rows_bold) |> 
+        row_spec(1:nrow(data), extra_css = "height: 1em; white-space: nowrap;") |> 
+        column_spec(1:ncol(data), width = "auto")
+    }
+    #Output if not mixed model output or not stats testing
+    else  {  
+      kbl(data,align = "l")  |> 
+        kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11,fixed_thead = T) |>
+        row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid") |>
+        row_spec(nrow(data), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") |>
+        row_spec(1:nrow(data), extra_css = "height: 1em; white-space: nowrap;") |> 
+        row_spec(grep("^Fixed Effect",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
+        row_spec(grep("^Trait Effects",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
+        row_spec(grep("^Random Effects",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
+        row_spec(grep("^Variance Partitioning",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
+        row_spec(grep("^Phylogenetic Effects",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
+        row_spec(grep("^Fit Statistics",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
+        column_spec(1:ncol(data), width = "auto") |> 
+        scroll_box(width = "1000px", height = "1000px")
+    }
+ }
+  else  {
+  #Output for other formats
+  if(stats == TRUE){ 
+
+  #Create table and highlight different sections
+  ft <-  flextable(data)
+   b <- fp_border(color = "black", width = 1)
+      
+      # Fixed Effect Comparisons
+      fixedcomp_row <- grep("^Fixed Effect Comparisons", data[,1])
+      ft  <- ft |> bold(i = fixedcomp_row, part = "body", bold = TRUE) |> 
+                   bg(i = fixedcomp_row, part = "body", bg   = "#E7E5E5") |> 
+                   hline(i = fixedcomp_row-1, part = "body", border = b) |> 
+                   hline(i = fixedcomp_row, part = "body", border = b)
+
+    # Trait Effects
+    trait_row <- grep("^Trait Effects", data[,1])
+    ft  <- ft |> bold(i = trait_row, part = "body", bold = TRUE) |> 
+                                  bg(i = trait_row, part = "body", bg   = "#E7E5E5") |> 
+                                  hline(i = trait_row-1, part = "body", border = b) |> 
+                                  hline(i = trait_row, part = "body", border = b)
+
+    # Random
+    random_row <- grep("^Random", data[,1])
+    ft  <- ft |> bold(i = random_row, part = "body", bold = TRUE) |> 
+                            bg(i = random_row, part = "body", bg   = "#E7E5E5") |> 
+                            hline(i = random_row-1, part = "body", border = b) |> 
+                            hline(i = random_row, part = "body", border = b)
+    # Variance partitioning
+    vp_row <- grep("^Variance Partitioning", data[,1])
+    ft  <- ft |> bold(i = vp_row, part = "body", bold = TRUE) |> 
+                                  bg(i = vp_row, part = "body", bg   = "#E7E5E5") |> 
+                                  hline(i = vp_row-1, part = "body", border = b) |> 
+                                  hline(i = vp_row, part = "body", border = b)
+    # Phylogenetic Effects
+    phy_row <- grep("^Phylogenetic Effects", data[,1])
+    ft  <- ft |> bold(i = phy_row, part = "body", bold = TRUE) |> 
+                                  bg(i = phy_row, part = "body", bg   = "#E7E5E5") |> 
+                                  hline(i = phy_row-1, part = "body", border = b) |> 
+                                  hline(i = phy_row, part = "body", border = b)
+     # Fit statistics
+    fit_row <- grep("^Fit Statistics", data[,1])
+    ft  <- ft |> bold(i = fit_row, part = "body", bold = TRUE) |> 
+                                  bg(i = fit_row, part = "body", bg   = "#E7E5E5") |> 
+                                  hline(i = fit_row-1, part = "body", border = b) |> 
+                                  hline(i = fit_row, part = "body", border = b)
+
+    #Overall formatting
+    ft <- ft |>
+          theme_vanilla() |>
+          flextable::fontsize(size = 10, part = "header") |>
+          flextable::fontsize(size = 8, part = "body") |>
+          bold(part = "header") |>
+          #Bold pMCMC less than 0.05
+          bold(i = which(rows_bold), j = 3, bold = TRUE, part = "body") |> 
+          bg(part = "header", bg = "#E7E5E5") |>
+          flextable::border(border.top = fp_border(color = "black", width = 1), part = "header") |>
+          flextable::border(border.bottom = fp_border(color = "black", width = 1), part = "header") |>
+          flextable::border(border.bottom = fp_border(color = "black", width = 1), i = nrow(data)) |>
+          set_table_properties(width=1,layout = "autofit",opts_html = list(scroll = list(height = "1000px", freeze_first_column = TRUE)),opts_word = list(keep_with_next = TRUE))
+          autofit(ft)
+  }
+    else {
+    ft <- flextable(data) |>
+          theme_vanilla() |>
+          flextable::fontsize(size = 10, part = "header") |>
+          flextable::fontsize(size = 8, part = "body") |>
+          bold(part = "header") |>
+          bg(part = "header", bg = "#E7E5E5") |>
+          flextable::border(border.top = fp_border(color = "black", width = 1), part = "header") |>
+          flextable::border(border.bottom = fp_border(color = "black", width = 1), part = "header") |>
+          flextable::border(border.bottom = fp_border(color = "black", width = 1), i = nrow(data)) |>
+          set_table_properties(width=1,layout = "autofit",opts_html = list(scroll = list(height = "1000px", freeze_first_column = TRUE)),opts_word = list(keep_with_next = TRUE))
+
+      autofit(ft)
+    }
+    }
+ }
+
+
 #function for df to Rmd table
-hmsc_md = function(df){
+hmsc_md2 = function(df){
   pacman::p_load(kableExtra)
   df = df %>% replace(is.na(.), "")
   kbl(df, align = "l", digits = 3) %>%
@@ -849,5 +991,5 @@ hmsc_md = function(df){
     row_spec(grep("^Random Effects",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Variance",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(grep("^Phylogenetic Effects",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
-    row_spec(grep("^Fit statistics",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
+    row_spec(grep("^Fit Statistics",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%
     row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px")}

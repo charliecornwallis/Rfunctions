@@ -722,7 +722,7 @@ md <- function(data,stats=FALSE) {
     }
  }
   else  {
-  #Ouput for other formats
+  #Output for other formats
   if(stats == TRUE){ 
 
   #Create table and highlight different sections

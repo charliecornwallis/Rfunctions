@@ -680,7 +680,7 @@ rename_xlsheets = function(wb,name,start_sheet=1) {
 #===========================================================
 #function for df to md table that can handle html and other formats e.g. word ----
 #===========================================================
-md <- function(data,stats=FALSE) {
+md_table <- function(data,stats=FALSE) {
   pacman::p_load(flextable,officer)
 
 ##Output if presenting mixed model stats: bolding significant values and highlighting headings
@@ -802,7 +802,7 @@ md <- function(data,stats=FALSE) {
 #===========================================================
 #function for df to Rmd table ----
 #===========================================================
-md_table = function(df){
+md_table2 = function(df){
   pacman::p_load(kableExtra)
   rows_bold = data |> mutate(signif = !grepl("\\(", pMCMC) & pMCMC < 0.05) |> pull(signif)
     kbl(df, align = "l", digits = 3) %>%    
@@ -816,17 +816,3 @@ md_table = function(df){
     row_spec(grep("^Partial Correlation Comparisons",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") %>%   
     row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") %>%    
     column_spec(column=3, bold =rows_bold)}
-
-#===========================================================
-## 2nd version
-#===========================================================
-md_table2 = function(df){pacman::p_load(kableExtra)  
-    kbl(df, align = "l", digits = 3) %>%    
-    kable_styling(bootstrap_options = c("hover", "condensed"),html_font="helvetica",font_size = 11) %>%    
-    row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
-    row_spec(grep("^Random",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
-    row_spec(grep("^Correlations",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
-    row_spec(grep("^Correlation Comparisons",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%  
-    row_spec(grep("^Partial Correlations",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
-    row_spec(grep("^Partial Correlation Comparisons",df[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid")%>%    
-    row_spec(nrow(df), extra_css = "border-bottom: 1px solid;margin-bottom:1000px")}

@@ -858,7 +858,8 @@ hmsc_md <- function(data,stats=FALSE) {
 ##Output if presenting mixed model stats: bolding significant values and highlighting headings
   if(stats == TRUE){
         #bold rows if less than 0.05 excluding cells with brackets which will be random effect
-        rows_bold = data |> mutate(signif = !grepl("\\(", pMCMC) & pMCMC < 0.05) |> pull(signif)
+        rows_bold = data |> mutate(signif = !grepl("\\(", pMCMC) & pMCMC < 0.05,
+                               signif = ifelse(is.na(signif),"FALSE",signif)) |> pull(signif)
   } else {
     #Other tables 
   } 
@@ -878,7 +879,7 @@ hmsc_md <- function(data,stats=FALSE) {
         row_spec(grep("^Phylogenetic Effects",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
         row_spec(grep("^Fit Statistics",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
         row_spec(nrow(data), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") |> 
-        column_spec(column=3, bold =rows_bold) |> 
+        column_spec(column=which(names(data) == "pMCMC"), bold =rows_bold) |> 
         row_spec(1:nrow(data), extra_css = "height: 1em; white-space: nowrap;") |> 
         column_spec(1:ncol(data), width = "auto")
     }

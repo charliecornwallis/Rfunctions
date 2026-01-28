@@ -773,7 +773,7 @@ md_table <- function(data,stats=FALSE) {
           flextable::fontsize(size = 8, part = "body") |>
           bold(part = "header") |>
           #Bold pMCMC less than 0.05
-          bold(i = which(rows_bold), j = 3, bold = TRUE, part = "body") |> 
+          bold(i = ~ pMCMC < 0.05, j = "pMCMC", bold = TRUE, part = "body") |>
           bg(part = "header", bg = "#E7E5E5") |>
           flextable::border(border.top = fp_border(color = "black", width = 1), part = "header") |>
           flextable::border(border.bottom = fp_border(color = "black", width = 1), part = "header") |>

@@ -26,21 +26,23 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   # fixed_names=c("A","B","C","D") #names of fixed effects
   # fixed_diffinc=c("A vs B") #the differences between fixed effects for species averages to include e.g. fixed_diffinc=c("A vs B")
   # fixed_diff_diffs =NULL #compare differences of differences between fixed effects of species averages e.g. fixed_diff_diffs=c("A vs B - C vs D")
-  #pvalues = exclusion of pMCMC values for fixed effects - "exclude" = exclude all, "include" = include all or index pvalues to be excluded e.g. "c(1,3)" removes 1st and 3rd, c(1:7) removes 1 to 7. Note pMCMC will still be calculated for fixed effect comparisons.
+  # pvalues =c(1:6) #exclusion of pMCMC values for fixed effects - "exclude" = exclude all, "include" = include all or index pvalues to be excluded e.g. "c(1,3)" removes 1st and 3rd, c(1:7) removes 1 to 7. Note pMCMC will still be calculated for fixed effect comparisons.
   # traits="include" #include trait effects: this examines the influence of species traits on community composition (e.g. richness if presence / absence of each species)
-  # pvalues_traits = as for pvalues, but in relation to traits. Default is exclude.
+  # pvalues_traits = "exclude" # as for pvalues, but in relation to traits. Default is exclude.
   # Include_random = "yes" #include random effect estimates or not
   # randomvar_names=c("R1","R2","R3") #names of random effects - will take from model object if not specified
   # VP_ave = "include" #include variance partitioning for species averages
-  # VPnames = renaming of terms in Variance partitioning table
+  # VPnames = #renaming of terms in Variance partitioning table
   # Include_species ="include" #should a separate sheet with species estimates be included?
   # fixed_diffinc_species="none" #differences between fixed effects to include for specific species e.g. fixed_diffinc_species=c(c("A: species1 vs B: species 1"))
   # VP_species = "include" #include variance partitioning for all species
-  # pvalues_species = "exclude". Same as above but for species level estimates. Default is exclude.
+  # pvalues_species = "exclude" # Same as above but for species level estimates. Default is exclude.
   # Include_random_species = "yes" #include random effect variances for each species
   # random_names_species = NULL #names for random effects for each species
   # padding=4 #spacing in excel file
-  # dec_PM=2) #decimal places of estimates
+  # dec_PM=2 #decimal places of estimates
+  # randomisation = "poisson" #what type of randomisation is used for community comparisons - random sampling from poisson distribution or randomisation of raw data
+  # response_logged = FALSE #Is the response logged - needed for creating random distributions for community comparisons
   # community_comparisons = NULL # can take a list of lists e.g. "community_comparisons = list(Factor1 = list(composition_metric = "jaccard",comp_names = c("A","B","C","D"),composition_comp = c("A vs B", "B vs C")), Continuous1 = list(composition_metric = "jaccard",comp_names = "A",ngrid = 5))". Any "composition_metric" in vegdist function of vegan package (e.g."bray" or "jaccard") is allowed.
   # composition_var #Factor1, Continuous1 above = name of variable to compare composition metrics as it appears in the model formula 
   # comp_names #the names of the variable as you want to appear in the table. For factors in must include all levels even if a level is not included in the comparisons (e.g. "D" above).
@@ -864,6 +866,9 @@ hmsc_md <- function(data,stats=FALSE) {
     #Other tables 
   } 
   
+  #Replace any NAs with blanks
+  data[is.na(data)] <- ""
+
   #Output if html format
   if (knitr::is_html_output()) {
   

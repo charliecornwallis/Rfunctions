@@ -692,6 +692,9 @@ md_table <- function(data,stats=FALSE) {
     #Other tables 
   } 
   
+#Replace any NAs with blanks
+  data[is.na(data)] <- ""
+
   #Output if html format
   if (knitr::is_html_output()) {
   

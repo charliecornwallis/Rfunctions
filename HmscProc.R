@@ -832,7 +832,9 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     addStyle(workbook, sheet4, style = hs2, rows = row_nums, cols = 1, gridExpand = TRUE)
 
     writeData(workbook, sheet4, model_fit_spp, startCol = 1, startRow = row_nums+1,headerStyle = hs2)
-    #If species estimate != "include" then just returns a workbook with estimates averaged across species    
+    #If species estimate != "include" then just returns a workbook with estimates averaged across species   
+    return(workbook)
+     
   } else  {
   }
     return(workbook)

@@ -901,8 +901,7 @@ hmsc_md <- function(data,stats=FALSE) {
         row_spec(grep("^Variance Partitioning",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
         row_spec(grep("^Phylogenetic Effects",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
         row_spec(grep("^Fit Statistics",data[,1]), bold=T,background="#E7E5E5",extra_css = "border-top: 1px solid; border-bottom: 1px solid") |> 
-        column_spec(1:ncol(data), width = "auto") |> 
-        scroll_box(width = "1000px", height = "1000px")
+        column_spec(1:ncol(data), width = "auto")
     }
  }
   else  {

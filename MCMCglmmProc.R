@@ -721,8 +721,7 @@ md_table <- function(data,stats=FALSE) {
         row_spec(0, bold=T,background="#E7E5E5", extra_css = "border-top: 1px solid; border-bottom: 1px solid") |>
         row_spec(nrow(data), extra_css = "border-bottom: 1px solid;margin-bottom:1000px") |>
         row_spec(1:nrow(data), extra_css = "height: 1em; white-space: nowrap;") |> 
-        column_spec(1:ncol(data), width = "auto") |> 
-        scroll_box(width = "1000px", height = "1000px")
+        column_spec(1:ncol(data), width = "auto") 
     }
  }
   else  {

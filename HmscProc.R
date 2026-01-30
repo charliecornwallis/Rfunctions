@@ -636,7 +636,6 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   
   }
 
-  
   #****************************************************
   #Section 3: per species values ----
   #****************************************************
@@ -792,7 +791,6 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #****************************************************
     #Variance Partitioning (% variation) of explained by fixed and random effects for each species  ----
     #****************************************************
-    if(VP_species == "include") {
       VP = as.data.frame(suppressWarnings(computeVariancePartitioning(model)$vals))
       VP = VP %>% mutate(across(everything(), ~round(., 4)*100))
       VP = data.frame("Variance Partitioning"=rownames(VP),"%"=VP,check.names=FALSE)
@@ -813,6 +811,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #****************************************************
     ##Excel output: variance partitioning for species ----
     #****************************************************
+    if(VP_species == "include") {
     #Create new sheet 
     sheet4 = paste(sheet,"species_VP",sep="_")
     start_row = 1
@@ -832,13 +831,14 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     writeData(workbook, sheet4, "Fit Statistics", startCol = 1, startRow = row_nums,headerStyle = hs2)
     addStyle(workbook, sheet4, style = hs2, rows = row_nums, cols = 1, gridExpand = TRUE)
 
-    writeData(workbook, sheet4, model_fit_spp, startCol = 1, startRow = row_nums+2,headerStyle = hs2)
+    writeData(workbook, sheet4, model_fit_spp, startCol = 1, startRow = row_nums+1,headerStyle = hs2)
     #If species estimate != "include" then just returns a workbook with estimates averaged across species    
   } else  {
+  }
     return(workbook)
   }
 }
-}
+
 
 #function for extracting df from xl workbook
 xl_2_df = function(xltab,sheet=NULL){

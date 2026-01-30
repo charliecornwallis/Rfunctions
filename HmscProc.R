@@ -828,8 +828,8 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
       writeData(workbook, sheet4, VP, startCol = 1, startRow = start_row+dim(header)[1],headerStyle = hs2)
       row_nums = start_row+dim(header)[1]+dim(VP)[1]+2
 
-  #Add Fit statistics
-    writeData(workbook, sheet4, "Fit Statistics", startCol = 1:3, startRow = row_nums,headerStyle = hs2)
+
+    writeData(workbook, sheet4, "Fit Statistics", startCol = 1, startRow = row_nums,headerStyle = hs2)
     addStyle(workbook, sheet4, style = hs2, rows = row_nums, cols = 1, gridExpand = TRUE)
 
     writeData(workbook, sheet4, model_fit_spp, startCol = 1, startRow = row_nums+2,headerStyle = hs2)
@@ -838,7 +838,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     return(workbook)
   }
 }
-
+}
 
 #function for extracting df from xl workbook
 xl_2_df = function(xltab,sheet=NULL){

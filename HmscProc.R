@@ -2,47 +2,38 @@
 #Function for processing Hmsc models#
 #***************************************
 
-HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",pvalues = "include",traits="exclude",trait_names=NULL,pvalues_traits= "exclude",VP_ave = "include",VPnames=NULL,randomvar_names=NULL,Include_random = "yes",Include_species ="exclude",pvalues_species="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",community_comparisons = NULL,randomisation = "poisson",response_logged = FALSE,padding=4,dec_PM=2)
+HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",sheet="sheet1",title="",fixed_names=NULL,fixed_diffinc="none",fixed_diff_diffs =NULL,fixed_diffinc_species="none",pvalues = "include",traits="exclude",trait_names=NULL,pvalues_traits= "exclude",VP_ave = "include",VPnames=NULL,randomvar_names=NULL,Include_random = "yes",Include_species ="exclude",pvalues_species="exclude", VP_species = "include",random_names_species=NULL,Include_random_species = "yes",community_comparisons = NULL,community_null = "constant",response_logged = FALSE,padding=4,dec_PM=2)
 { 
   #Explanation ----
-  #1. Takes an Hmsc model and combines estimates from multiple chains and output 2 excel sheets: 1) averages across species; 2) Per species values. If there are multiple species these are averaged per mcmc sample using rowMeans to produce posterior distribution of average effects.
-  #2. Estimates posterior modes and HPDintervals for effects
-  #3. Calculates specified differences for fixed effects
-  #4. If community_comparisons is specified (list of composition_metric,composition_variables, composition_comparisons (factors) and ngrid (# cut points for continuous variables default is 5) then it will calculate community composition differences and test if they are different from randomised data. Random communities are created in two possible ways: randomisation = "poisson" creates communities by sampling each taxa from a Poisson distribution with mean = mean taxa presence / abundance.response_logged=TRUE is used if log counts are modelled. Randomisation != poisson reruns model using randomised occurrence matrix (warning this can be slow).
-  #5. For models with trait data, combines runs and estimates trait effects
-  #6. Calculates average variance explained by random effects
-  #7. Calculates % variation of explained by fixed and random effects 
-  #8. For models with phylogenetic effects it outputs Rho
-  #9. Calculates fit statistics
-  #10. Output results to excel file
-  
-  #Example Terms
-  # model=hm1 # model object
-  # start_row=NULL #start row of excel sheet for species averages
-  # workbook=NULL #name of workbook to add results to if already exists
-  # create_sheet="yes" #create a new sheet for species average values
-  # sheet="Table 1" #what to name sheet
-  # title="Life is good" #title of tables
-  # fixed_names=c("A","B","C","D") #names of fixed effects
-  # fixed_diffinc=c("A vs B") #the differences between fixed effects for species averages to include e.g. fixed_diffinc=c("A vs B")
-  # fixed_diff_diffs =NULL #compare differences of differences between fixed effects of species averages e.g. fixed_diff_diffs=c("A vs B - C vs D")
-  # pvalues =c(1:6) #exclusion of pMCMC values for fixed effects - "exclude" = exclude all, "include" = include all or index pvalues to be excluded e.g. "c(1,3)" removes 1st and 3rd, c(1:7) removes 1 to 7. Note pMCMC will still be calculated for fixed effect comparisons.
-  # traits="include" #include trait effects: this examines the influence of species traits on community composition (e.g. richness if presence / absence of each species)
-  # pvalues_traits = "exclude" # as for pvalues, but in relation to traits. Default is exclude.
-  # Include_random = "yes" #include random effect estimates or not
-  # randomvar_names=c("R1","R2","R3") #names of random effects - will take from model object if not specified
-  # VP_ave = "include" #include variance partitioning for species averages
-  # VPnames = #renaming of terms in Variance partitioning table
-  # Include_species ="include" #should a separate sheet with species estimates be included?
-  # fixed_diffinc_species="none" #differences between fixed effects to include for specific species e.g. fixed_diffinc_species=c(c("A: species1 vs B: species 1"))
-  # VP_species = "include" #include variance partitioning for all species
-  # pvalues_species = "exclude" # Same as above but for species level estimates. Default is exclude.
-  # Include_random_species = "yes" #include random effect variances for each species
-  # random_names_species = NULL #names for random effects for each species
-  # padding=4 #spacing in excel file
-  # dec_PM=2 #decimal places of estimates
-  # randomisation = "poisson" #what type of randomisation is used for community comparisons - random sampling from poisson distribution or randomisation of raw data
-  # response_logged = FALSE #Is the response logged - needed for creating random distributions for community comparisons
+  #1. Takes an Hmsc model and combines estimates from multiple chains and outputs up to 4 excel sheets:
+  #   averages across species; community comparisons; per-species estimates; per-species variance partitioning.
+  #   Community averages use rowMeans across species per MCMC sample to produce a posterior of average effects.
+  #2. Estimates posterior modes and HPD intervals for all effects.
+  #3. Calculates specified pairwise differences for fixed effects.
+  #4. If community_comparisons is specified, calculates pairwise community dissimilarity along focal
+  #   covariate gradients and tests whether dissimilarity exceeds a model-based null (see community_null).
+  #5. For models with trait data, combines chains and estimates trait effects (Gamma).
+  #6. Calculates average variance explained by random effects (Omega diagonals).
+  #7. Calculates % variation explained by fixed and random effects via computeVariancePartitioning.
+  #8. For models with phylogenetic effects, outputs the phylogenetic signal parameter Rho.
+  #9. Calculates model fit statistics (R^2) via evaluateModelFit on posterior predictive distribution.
+  #10. Writes all results to an Excel workbook.
+  # community_null = "constant" # null model used to test whether community dissimilarity exceeds chance.
+  #   "constant": the focal covariate is fixed at its sample mean (continuous variables) or first
+  #               factor level (categorical variables) for all prediction points. The null community
+  #               represents expected composition when the focal covariate has no gradient — all
+  #               sites experience the average value. Remaining dissimilarity under the null arises
+  #               from stochastic sampling variation only. Use this when covariates are on any scale.
+  #   "zero":     the focal covariate is fixed at zero for all prediction points. For mean-centred
+  #               or standardised covariates (mean ≈ 0), this is equivalent to "constant". For raw
+  #               uncentred covariates, zero may lie outside the observed data range — a warning is
+  #               issued. Directly tests H0: the focal covariate's contribution to the linear
+  #               predictor (beta × X = 0) generates no community turnover. Use this when the
+  #               model covariates are mean-centred or standardised.
+  # response_logged = FALSE # set TRUE if you log-transformed Y before fitting (e.g. log(Y+1) as
+  #               a continuous response); back-transforms predictions before dissimilarity is computed.
+  #               Not required for Hmsc Poisson family — predictions from expected=FALSE are already
+  #               on the count scale.
   # community_comparisons = NULL # can take a list of lists e.g. "community_comparisons = list(Factor1 = list(composition_metric = "jaccard",comp_names = c("A","B","C","D"),composition_comp = c("A vs B", "B vs C")), Continuous1 = list(composition_metric = "jaccard",comp_names = "A",ngrid = 5))". Any "composition_metric" in vegdist function of vegan package (e.g."bray" or "jaccard") is allowed.
   # composition_var #Factor1, Continuous1 above = name of variable to compare composition metrics as it appears in the model formula 
   # comp_names #the names of the variable as you want to appear in the table. For factors in must include all levels even if a level is not included in the comparisons (e.g. "D" above).
@@ -51,8 +42,9 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #Section 1: averages per species ----
   #****************************************************
   
-  #Load packages and naming
-  pacman::p_load(Hmsc,coda,stringdist,matrixStats,openxlsx,vegan,reshape2)
+  #Load packages
+  pacman::p_load(Hmsc,coda,stringdist,matrixStats,openxlsx,vegan,reshape2,
+                 dplyr,tidyr,purrr)
   
   #Convert model object
   post_model = convertToCodaObject(model)
@@ -60,9 +52,8 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   #****************************************************
   #Check terms are specified correctly ----
   #****************************************************
-  if (is.null(fixed_names) &  any(fixed_diffinc != "none")) {
+  if(is.null(fixed_names) & any(fixed_diffinc != "none")) {
     stop("fixed names needs to be specified for fixed_diffinc to be calculated")
-  } else {
   }
   
   #****************************************************
@@ -92,21 +83,23 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   } else  {colnames(fixed_mod)<-fixed_names
   }
   
-  #P values using summary.MCMCglmm code
-  nF=dim(fixed_mod)[2]
-  #Pvalues = option to exclude 
-  if(any(pvalues == "include")) {
-    fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
-    fe1_p=round(as.numeric(fe1_p),3)
-  } else  {
-    if(any(pvalues == "exclude")) {
-      fe1_p=rep("-",length(fixed_names))
-    } else  {
-      fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nF, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
-      fe1_p=round(as.numeric(fe1_p),3)
-      fe1_p[pvalues]<-"-"
-    }
+  # Helper: compute pMCMC for columns of an MCMC sample matrix.
+  # pvalues = "include"  → return values for all columns
+  # pvalues = "exclude"  → return "-" for all columns
+  # pvalues = integer index → return "-" for indexed columns, values for the rest
+  calc_pmcmc <- function(samples_mat, pvalues, n_cols) {
+    n_its <- nrow(samples_mat)
+    p <- pmax(0.5 / n_its,
+              pmin(colSums(samples_mat[, 1:n_cols, drop = FALSE] > 0) / n_its,
+                   1 - colSums(samples_mat[, 1:n_cols, drop = FALSE] > 0) / n_its)) * 2
+    p <- round(as.numeric(p), 3)
+    if(any(pvalues == "exclude")) return(rep("-", n_cols))
+    if(!any(pvalues == "include")) p[pvalues] <- "-"
+    p
   }
+
+  nF    <- dim(fixed_mod)[2]
+  fe1_p <- calc_pmcmc(fixed_mod, pvalues, nF)
   
   fe1=paste(round(posterior.mode(fixed_mod),dec_PM)," (",round(HPDinterval(fixed_mod)[,1],dec_PM), ", ",round(HPDinterval(fixed_mod)[,2],dec_PM),")",sep="")
   fe1=data.frame(Fixed_Effects=colnames(fixed_mod),Estimates=fe1, pMCMC=fe1_p)
@@ -151,9 +144,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   
   
   ##fixed_diff_diffs ----
-  if(is.null(fixed_diff_diffs)) {
-    fixed=fixed
-  } else  {
+  if(!is.null(fixed_diff_diffs)) {
     #create matrix of diffs
     #function for calculating differences between all columns of a matrix
     pairwise.diffs.mat <- function(x)
@@ -216,35 +207,21 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   gamma = do.call(rbind, post_model$Gamma)
 
   #Rename model trait names
-  if(is.null(trait_names)) {
-  } else  {model$trNames<-trait_names
+  if(!is.null(trait_names)) model$trNames <- trait_names
+
+  # Build trait × covariate combination names for gamma columns.
+  # Uses colnames(fixed_mod) rather than fixed_names to handle the case
+  # where fixed_names was NULL (model$covNames was used as the column names).
+  gamma_names <- character()
+  for(i in seq_along(model$trNames)){
+    gamma_names <- c(gamma_names, paste(model$trNames[i], colnames(fixed_mod), sep = "_"))
   }
-  
-  #name columns more clearly
-  gamma_names = character()
-  for(i in 1:length(model$trNames)){
-    tmp = paste(model$trNames[i],fixed_names,sep="_")
-    gamma_names = c(gamma_names,tmp)
-  } 
   
   colnames(gamma) = gamma_names
   gamma = as.mcmc(gamma)
   
-  #P values using summary.MCMCglmm code
-  nG=dim(gamma)[2]
-  #Pvalues = option to exclude 
-  if(any(pvalues_traits == "include")) {
-    ge1_p=pmax(0.5/dim(gamma)[1], pmin(colSums(gamma[,1:nG, drop = FALSE] > 0)/dim(gamma)[1], 1 - colSums(gamma[, 1:nG, drop = FALSE] > 0)/dim(gamma)[1]))*2
-    ge1_p=round(as.numeric(ge1_p),3)
-  } else  {
-    if(any(pvalues_traits == "exclude")) {
-      ge1_p=rep("-",length(gamma_names))
-    } else  {
-      ge1_p=pmax(0.5/dim(gamma)[1], pmin(colSums(gamma[,1:nG, drop = FALSE] > 0)/dim(gamma)[1], 1 - colSums(gamma[, 1:nG, drop = FALSE] > 0)/dim(gamma)[1]))*2
-      ge1_p=round(as.numeric(ge1_p),3)
-      ge1_p[pvalues_traits]<-"-"
-    }
-  }
+  nG    <- dim(gamma)[2]
+  ge1_p <- calc_pmcmc(gamma, pvalues_traits, nG)
   
   ge1=paste(round(posterior.mode(gamma),dec_PM)," (",round(HPDinterval(gamma)[,1],dec_PM), ", ",round(HPDinterval(gamma)[,2],dec_PM),")",sep="")
   ge1=data.frame("Trait Effects"=colnames(gamma),Estimates=ge1, pMCMC=ge1_p,check.names=FALSE)
@@ -261,16 +238,13 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     tmp1 = do.call(rbind, post_model$Omega[[i]])
     tmp2= matrix(nrow = dim(tmp1)[1], ncol =model$ns)
     
-    #extract variances for each species for each random effect
-    for(j in 1:dim(tmp1)[1]){
-    tmp3 = matrix(tmp1[j,],nrow = model$ns, ncol =model$ns)
-    tmp3 = diag(tmp3)
-    tmp2[j,] = tmp3 
-    }
-    
-    #Average across species
-    tmp2 = rowMeans(tmp2)
-    random_mod[,i] = tmp2
+    # Extract the diagonal of each MCMC sample's species covariance matrix.
+    # Each row of tmp1 is the flattened ns×ns Omega matrix for one sample;
+    # the diagonal gives the variance (not covariance) for each species.
+    tmp2 <- t(apply(tmp1, 1, function(row) diag(matrix(row, nrow = model$ns, ncol = model$ns))))
+
+    #Average variances across species for each sample
+    random_mod[, i] <- rowMeans(tmp2)
   }
   
     random_mod<-as.mcmc(random_mod)
@@ -286,44 +260,41 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     randomVar = paste(round(posterior.mode(random_mod),dec_PM)," (",round(HPDinterval(random_mod)[,1],dec_PM), ", ",round(HPDinterval(random_mod)[,2],dec_PM),")",sep="")
     randomVar = data.frame("Random Effects"=colnames(random_mod),"Posterior Mode (CI)"=randomVar,"-"="",check.names=FALSE)
     
-  } else  {
   }
-  
+
+  # Compute predictions and variance partitioning once here; both are reused in
+  # Section 3 (per-species) to avoid running the same expensive call twice.
+  model_preds <- computePredictedValues(model)
+  VP_all      <- suppressWarnings(computeVariancePartitioning(model)$vals)
+
   #****************************************************
-  #% variation of explained by fixed and random effects averaged across species  ----
+  #% variation explained by fixed and random effects averaged across species  ----
   #****************************************************
   if(VP_ave == "include") {
-    VP = suppressWarnings(computeVariancePartitioning(model)$vals)
-    VP = data.frame(rowMeans(VP))
-    VP = VP %>% mutate(across(everything(), ~round(., 4)*100))
-    
-    if(is.null(VPnames)) {
-    } else  {
-      rownames(VP) = VPnames
-    }
-    
-    VP = data.frame("Variance Partitioning"=rownames(VP),"%"=VP[,1],check.names=FALSE)
-    rownames(VP)<-NULL
-  } else  {
+    VP <- data.frame(rowMeans(VP_all))
+    VP <- VP |> mutate(across(everything(), ~round(., 4) * 100))
+    if(!is.null(VPnames)) rownames(VP) <- VPnames
+    VP <- data.frame("Variance Partitioning" = rownames(VP), "%" = VP[, 1], check.names = FALSE)
+    rownames(VP) <- NULL
   }
-  
+
   #****************************************************
   #Phylo effects ----
   #****************************************************
-  #Rho = does not ask whether the species traits are correlated with the phylogeny, a question that is often in the focus of phylogenetic comparative analyses. Instead, the phylogenetic signal parameter ρ measures whether the species niches (i.e., their responses to the environmental covariates, as measured by the β parameters) show phylogenetic correlations.
-  if(is.null(post_model$Rho)) {
-  } else  {
-    rho = as.mcmc(unlist(post_model$Rho))
-    rho = paste(round(posterior.mode(rho),dec_PM)," (",round(HPDinterval(rho)[,1],dec_PM), ", ",round(HPDinterval(rho)[,2],dec_PM),")",sep="")
-    rho = data.frame("Phylogenetic Effects"="Rho", "Posterior Mode (CI)"=rho,check.names=FALSE)
+  # Rho measures whether species niches (β parameters) show phylogenetic signal —
+  # i.e. whether closely related species respond similarly to environmental covariates.
+  if(!is.null(post_model$Rho)) {
+    rho <- as.mcmc(unlist(post_model$Rho))
+    rho <- paste(round(posterior.mode(rho), dec_PM), " (",
+                 round(HPDinterval(rho)[, 1], dec_PM), ", ",
+                 round(HPDinterval(rho)[, 2], dec_PM), ")", sep = "")
+    rho <- data.frame("Phylogenetic Effects" = "Rho", "Posterior Mode (CI)" = rho, check.names = FALSE)
   }
-  
+
   #****************************************************
   #Fit statistics ----
   #****************************************************
-  # To assess model fit in terms of $R^2$, we apply the `evaluateModelFit` function to the posterior predictive distribution computed by the function `computePredictedValues`.
-  model_preds = computePredictedValues(model)
-  model_fit = as.data.frame(evaluateModelFit(model, predY=model_preds))
+  model_fit <- as.data.frame(evaluateModelFit(model, predY = model_preds))
   
   #Round fit stats
   model_fit = model_fit %>% dplyr::summarise(across(everything(), ~mean(., na.rm=T))) %>% mutate(across(everything(), ~round(., 2))) 
@@ -338,22 +309,9 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   fixeddiff <- fixed[grepl(" vs ",fixed$Fixed_Effects),]
   fixeddiff<-data.frame("Fixed Effect Comparisons"=fixeddiff$Fixed_Effects,"Posterior Mode (CI)"=fixeddiff$Estimates,"pMCMC"=round(as.numeric(fixeddiff$pMCMC),3),check.names=FALSE)
   
-  #Create excel workbook if not specified
-  if(is.null(workbook)) {
-    workbook<- createWorkbook()
-  } else  {workbook
-  }
-  #Create excel sheet if not specified
-  if(create_sheet == "yes") {
-    addWorksheet(workbook, sheet)
-  } else  {sheet=sheet
-  }
-  
-  #Calculate start row
-  if(is.null(start_row)) {
-    start_row=1
-  } else  {start_row=start_row
-  }
+  if(is.null(workbook))    workbook  <- createWorkbook()
+  if(create_sheet == "yes") addWorksheet(workbook, sheet)
+  if(is.null(start_row))   start_row <- 1
   
   #Table headers
   hs1 <- createStyle(fgFill = "white", halign = "LEFT", textDecoration = "bold",border = "TopBottom")
@@ -394,17 +352,14 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
   }
   
   if(VP_ave == "include") {
-    writeData(workbook, sheet, VP, startCol = 1, startRow = row_nums,headerStyle = hs2)
-    row_nums = row_nums + dim(VP)[1]+1
-  } else  {
+    writeData(workbook, sheet, VP, startCol = 1, startRow = row_nums, headerStyle = hs2)
+    row_nums <- row_nums + dim(VP)[1] + 1
   }
-  
-  if(is.null(post_model$Rho)) {
-    workbook=workbook  
-  } else  {
-    writeData(workbook, sheet, rho, startCol = 1, startRow = row_nums,headerStyle = hs2)
-    row_nums = row_nums + dim(rho)[1]+2
-    }
+
+  if(!is.null(post_model$Rho)) {
+    writeData(workbook, sheet, rho, startCol = 1, startRow = row_nums, headerStyle = hs2)
+    row_nums <- row_nums + dim(rho)[1] + 2
+  }
   
   writeData(workbook, sheet, "Fit Statistics",startCol = 1, startRow = row_nums,headerStyle = hs2)
   addStyle(workbook, sheet, style = hs2, rows = row_nums, cols = 1:3, gridExpand = TRUE)
@@ -426,191 +381,273 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     composition_metric = community_comparisons[[i]]$composition_metric
     comp_names = community_comparisons[[i]]$comp_names
     
-    #setup predictions: need to setup differently for continuous and categorical variables
+    # Preserve the original model formula variable name before any display relabelling.
+    # The original name is needed to look up values in model$XData and to pass the
+    # correct column name to predict(), which uses the model formula internally.
+    composition_var_orig <- composition_var
+
+    # -------------------------------------------------------
+    # Build the prediction gradient (constructGradient fixes all
+    # non-focal variables at their means; the focal variable spans
+    # its observed range for continuous variables or all levels for
+    # categorical variables). Predict calls are deferred until after
+    # the null design is built, so both use identical settings.
+    # -------------------------------------------------------
     if(is.null(community_comparisons[[i]]$composition_comp)) {
-      #continuous effects
-      ngrid = ifelse(is.null(community_comparisons[[i]]$ngrid),5,community_comparisons[[i]]$ngrid) #number of points along the gradient 
-      
-      #Construct gradient for predictions
-      comp_1 = constructGradient(model, focalVariable = composition_var,      
-                                 non.focalVariables = 1,
-                                 ngrid = ngrid)
-      
-      #Predict values
-      comp_1_predictions = predict(model, 
-                                   XData=comp_1$XDataNew, 
-                                   studyDesign=comp_1$studyDesignNew, 
-                                   ranLevels=comp_1$rLNew)
-      
-      #rename
-      colnames(comp_1$XDataNew)[1] = comp_names[1]
-      composition_var = comp_names[1]
-      
-    } else  {
-      #categorical effects
-      composition_comp = community_comparisons[[i]]$composition_comp
-      #Construct predictions
-      comp_1 = constructGradient(model, focalVariable = composition_var,      
-                                 non.focalVariables = 1)
-      
-      #Predict values
-      comp_1_predictions = predict(model, 
-                                   XData=comp_1$XDataNew, 
-                                   studyDesign=comp_1$studyDesignNew, 
-                                   ranLevels=comp_1$rLNew)
-      #rename
-      comp_1$XDataNew[,1] = comp_names
-      comp_1$XDataNew[,1] = as.factor(comp_1$XDataNew[,1])
+      # Continuous focal variable: evenly spaced grid across observed range
+      ngrid <- ifelse(is.null(community_comparisons[[i]]$ngrid), 5,
+                      community_comparisons[[i]]$ngrid)
+      comp_1 <- constructGradient(model,
+                                  focalVariable      = composition_var_orig,
+                                  non.focalVariables = 1,
+                                  ngrid              = ngrid)
+    } else {
+      # Categorical focal variable: one row per factor level
+      composition_comp <- community_comparisons[[i]]$composition_comp
+      comp_1 <- constructGradient(model,
+                                  focalVariable      = composition_var_orig,
+                                  non.focalVariables = 1)
     }
-    
-    #Create a dataframe to write dissimilarity metric to
-    comp_res = data.frame()
-    comp_diff = data.frame()
-    
-    #Comparing communities to randomised community
-    if(randomisation == "poisson") {
-    
-    #Compared to communities sample from Poisson distribution with mean = to prevalence of each taxa
-    #for each iteration calculate dissimilarity and write to results to dataframe
-    for(j in 1:length(comp_1_predictions)){
-      dissim = as.data.frame(comp_1_predictions[j]) #model predictions
-      
-      #Code below creates random expectation by sampling from a Poisson distribution with mean = to prevalence of each taxa. If jaccard then set max to 1 (e.g. present)
-      tax_means = as.data.frame(model$Y)
-      tax_means = colMeans(tax_means) #mean prevalence/abundance of each taxa
-      
-      if (composition_metric == "jaccard") {
-        #dissimR = matrix(rpois(length(dissim), mean(as.matrix(dissim))), nrow = nrow(dissim), ncol = ncol(dissim))
-        dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
-        for (k in 1:ncol(dissim)) {
-          dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
-        }
-        dissimR = pmin(dissimR, 1)
+
+    # -------------------------------------------------------
+    # Build the NULL prediction design
+    # -------------------------------------------------------
+    # The null represents the community when the focal covariate is
+    # held at a single constant value across all gradient points.
+    # Because the only thing varying across gradient points is the
+    # focal covariate (all others are fixed at their means by
+    # constructGradient), fixing the focal covariate at a constant
+    # value makes all prediction rows identical. The null community
+    # therefore differs between gradient points only due to stochastic
+    # sampling variation (from expected = FALSE, see below).
+    #
+    # community_null = "constant":
+    #   Continuous: focal covariate fixed at its sample mean across
+    #   all training sites. Null asks: "How dissimilar would
+    #   communities be if every site experienced the average value
+    #   of the focal covariate?"
+    #   Categorical: all rows set to the first (reference) factor level.
+    #
+    # community_null = "zero":
+    #   Continuous: focal covariate fixed at 0. For mean-centred /
+    #   standardised covariates this equals the mean (identical to
+    #   "constant"). For raw uncentred covariates, 0 may be outside
+    #   the observed range — a warning is issued.
+    #   Categorical: same as "constant" (reference level = X = 0
+    #   in dummy coding).
+    # -------------------------------------------------------
+    XDataNull <- comp_1$XDataNew   # copy; we modify only the focal column
+
+    if(community_null == "constant") {
+
+      if(is.factor(comp_1$XDataNew[, composition_var_orig])) {
+        # Categorical: fix all rows at the first factor level
+        null_level <- levels(comp_1$XDataNew[, composition_var_orig])[1]
+        XDataNull[, composition_var_orig] <- factor(
+          null_level, levels = levels(comp_1$XDataNew[, composition_var_orig]))
       } else {
-        if (response_logged == TRUE) {
-          #Backtransform if response is logged
-          dissim = exp(as.matrix(dissim))
-          dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
-          for (k in 1:ncol(dissim)) {
-            dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
-          }
-          dissimR = log(dissimR+1)
-        } else {
-          dissimR <- matrix(nrow = nrow(dissim), ncol = ncol(dissim))
-          for (k in 1:ncol(dissim)) {
-            dissimR[, k] <- rpois(nrow(dissim), tax_means[k])
-          }
+        # Continuous: fix at sample mean of the training data
+        XDataNull[, composition_var_orig] <- mean(model$XData[, composition_var_orig])
+      }
+
+    } else if(community_null == "zero") {
+
+      if(is.factor(comp_1$XDataNew[, composition_var_orig])) {
+        # Categorical: reference level corresponds to all-zero dummy coding
+        null_level <- levels(comp_1$XDataNew[, composition_var_orig])[1]
+        XDataNull[, composition_var_orig] <- factor(
+          null_level, levels = levels(comp_1$XDataNew[, composition_var_orig]))
+      } else {
+        # Continuous: fix at 0; warn if covariate is not mean-centred,
+        # as X = 0 may then lie outside the observed data range
+        covar_mean <- mean(model$XData[, composition_var_orig])
+        covar_sd   <- sd(  model$XData[, composition_var_orig])
+        if(abs(covar_mean) > 0.1 * covar_sd) {
+          warning(paste0(
+            "community_null = 'zero': covariate '", composition_var_orig,
+            "' does not appear to be mean-centred ",
+            "(mean = ", round(covar_mean, 3), ", SD = ", round(covar_sd, 3), "). ",
+            "Fixing X = 0 may extrapolate outside the observed range. ",
+            "Consider mean-centring the covariate or using community_null = 'constant'."
+          ))
         }
+        XDataNull[, composition_var_orig] <- 0
       }
-      
-      #rename
-      dissim_names = data.frame(code =rownames(comp_1$XDataNew),names=comp_1$XDataNew[,composition_var])
-      dissim_names = dissim_names %>% mutate_if(is.numeric, round, 1)
-      
-      #Calculate similarity
-      real = melt(as.matrix(vegdist(dissim, method = composition_metric)), varnames = c("code1", "code2"), value.name = composition_metric) #dissimilarity measure on real data
-      ran = melt(as.matrix(vegdist(dissimR, method = composition_metric)), varnames = c("code1", "code2"), value.name = paste(composition_metric,"R",sep="")) #dissimilarity measure on randomised data
-      
-      tmp = left_join(real,ran, by = c("code1" = "code1", "code2" = "code2")) 
-      tmp = tmp %>% mutate(diff=tmp[,3]-tmp[,4], #calculate difference in dissimlarity metric between real and randomised data
-                           name_1=dissim_names$names[match(code1,dissim_names$code)], #change actual names
-                           name_2=dissim_names$names[match(code2,dissim_names$code)], #change actual names
-                           name_12=paste0(name_1," vs ",name_2)) %>% 
-        filter(name_1 != name_2) %>%
-        dplyr::select(-c(code1,code2,name_1,name_2)) 
 
-      tmp1 = tmp %>% dplyr::select(name_12, composition_metric) %>% pivot_wider(names_from = name_12, values_from = composition_metric) #matrix of real values
-      tmp2 = tmp %>% dplyr::select(name_12, diff) %>% pivot_wider(names_from = name_12, values_from = diff) #matrix of differences between real and randomised values
-
-      
-      comp_res = rbind(comp_res,tmp1) #combine estimates from different iterations
-      comp_diff = rbind(comp_diff,tmp2) #combine difference estimates from different iterations
-      }
-      
-    }  else  {
-      
-    #*******************************************  
-    #Randomise response data: takes along time
-    rand_list <- vector("list", length(comp_1_predictions))
-    for (j in 1:length(comp_1_predictions)) {
-      rand_list[[j]] <- model$Y[sample(nrow(model$Y)), sample(ncol(model$Y))]
+    } else {
+      stop("community_null must be 'constant' or 'zero'.")
     }
-    
-    #for each iteration calculate dissimilarity and write to results to dataframe
-    for(k in 1:length(comp_1_predictions)){
-      #Predict real data for each iteration
-      dissim = as.data.frame(comp_1_predictions[k]) #model predictions 
-      
-      #run model on randomised data for each model
-      modelR = Hmsc(Y = rand_list[[k]], XData=model$XData,
-                 XFormula = as.formula(model$XFormula),
-                 studyDesign = model$studyDesign,
-                 ranLevels=model$ranLevels, #this models residual correlations between species
-                 phyloTree = model$phyloTree,
-                 distr = model$distr)
-      #Run
-      modelR = sampleMcmc(modelR, thin = 1, samples = 2, transient = 0,
-                       nChains = 1, verbose = 0, nParallel = 1,updater=list(GammaEta=FALSE))
-      #Construct predictions
-      comp_1R = constructGradient(modelR, focalVariable = composition_var,non.focalVariables = 1)
-      
-      #Predict values
-      comp_1_predictionsR = predict(modelR, 
-                                    XData=comp_1R$XDataNew, 
-                                    studyDesign=comp_1R$studyDesignNew, 
-                                    ranLevels=comp_1R$rLNew)
-      dissimR = as.data.frame(comp_1_predictionsR[2]) 
-     
-      #rename
-      dissim_names = data.frame(code =rownames(comp_1$XDataNew),names=comp_1$XDataNew[,composition_var])
-      dissim_names = dissim_names %>% mutate_if(is.numeric, round, 1)
-      
-      #Calculate similarity
-      real = melt(as.matrix(vegdist(dissim, method = composition_metric)), varnames = c("code1", "code2"), value.name = composition_metric) #dissimilarity measure on real data
-      ran = melt(as.matrix(vegdist(dissimR, method = composition_metric)), varnames = c("code1", "code2"), value.name = paste(composition_metric,"R",sep="")) #dissimilarity measure on randomised data
-      
-      tmp = left_join(real,ran, by = c("code1" = "code1", "code2" = "code2")) 
-      tmp = tmp %>% mutate(diff=tmp[,3]-tmp[,4], #calculate difference in dissimlarity metric between real and randomised data
-                           name_1=dissim_names$names[match(code1,dissim_names$code)], #change actual names
-                           name_2=dissim_names$names[match(code2,dissim_names$code)], #change actual names
-                           name_12=paste0(name_1," vs ",name_2)) %>% 
-        filter(name_1 != name_2) %>%
-        dplyr::select(-c(code1,code2,name_1,name_2)) 
-      
-        tmp1 = tmp %>% dplyr::select(name_12, composition_metric) %>% pivot_wider(names_from = name_12, values_from = composition_metric) #matrix of real values
-        tmp2 = tmp %>% dplyr::select(name_12, diff) %>% pivot_wider(names_from = name_12, values_from = diff) #matrix of differences between real and randomised values
 
-      comp_res = rbind(comp_res,tmp1) #combine estimates from different iterations
-      comp_diff = rbind(comp_diff,tmp2) #combine difference estimates from different iterations
-      
-    }  
-    }  
-    
-    #remove rows where differences between communities weren't possible to calculate. This can happen where categories to be compared both have 0 presence.
-    comp_res = comp_res[complete.cases(comp_res),] 
-    comp_diff = comp_diff[complete.cases(comp_diff),] 
-    
-    #select specified comparisons if specified if not keep all
+    # -------------------------------------------------------
+    # Predict real and null communities from the posterior
+    # -------------------------------------------------------
+    # expected = FALSE samples actual observations from the posterior
+    # predictive distribution — 0/1 for presence-absence (probit),
+    # non-negative integers for counts (Poisson), continuous values
+    # for normal responses. Using expected = FALSE for BOTH predictions
+    # ensures they are on the same observed-data scale, making their
+    # dissimilarity values directly comparable.
+    #
+    # When expected = TRUE (the default), all null prediction rows are
+    # identical (same covariate value) so pairwise dissimilarity is
+    # identically zero — the comparison would be trivial. expected = FALSE
+    # introduces stochastic sampling variation, giving a meaningful
+    # non-zero null dissimilarity that reflects chance fluctuations.
+    # -------------------------------------------------------
+
+    # Real community predictions: vary because the focal covariate varies
+    comp_1_predictions <- predict(model,
+                                  XData       = comp_1$XDataNew,
+                                  studyDesign = comp_1$studyDesignNew,
+                                  ranLevels   = comp_1$rLNew,
+                                  expected    = FALSE)
+
+    # Null community predictions: focal covariate held constant
+    null_predictions <- predict(model,
+                                XData       = XDataNull,
+                                studyDesign = comp_1$studyDesignNew,
+                                ranLevels   = comp_1$rLNew,
+                                expected    = FALSE)
+
+    # -------------------------------------------------------
+    # Display relabelling (AFTER predict calls, for output only)
+    # Renaming is purely cosmetic — it does not affect the predictions.
+    # -------------------------------------------------------
     if(is.null(community_comparisons[[i]]$composition_comp)) {
-      comp_res = as.mcmc(comp_res)
-      comp_diff = as.mcmc(comp_diff) 
-    } else  {
-      comp_res = as.mcmc(comp_res[,composition_comp])
-      comp_diff = as.mcmc(comp_diff[,composition_comp]) 
-    } 
-    
-    #Pvalue of differences
-    nC = dim(comp_diff)[2]
-    cc1_p = pmax(0.5/dim(comp_diff)[1], pmin(colSums(comp_diff[,1:nC, drop = FALSE] > 0)/dim(comp_diff)[1], 1 - colSums(comp_diff[, 1:nC, drop = FALSE] > 0)/dim(comp_diff)[1]))*2
-    
-    #Format estimates
-    cc1_res=paste(round(posterior.mode(comp_res),dec_PM)," (",round(HPDinterval(comp_res)[,1],dec_PM), ", ",round(HPDinterval(comp_res)[,2],dec_PM),")",sep="")
-    cc1_diff=paste(round(posterior.mode(comp_diff),dec_PM)," (",round(HPDinterval(comp_diff)[,1],dec_PM), ", ",round(HPDinterval(comp_diff)[,2],dec_PM),")",sep="")
-    
-    cc1=data.frame("Variable"=composition_var,"Community Comparison"=colnames(comp_res),"Posterior Mode (CI)"=cc1_res, "Difference from Random Posterior Mode (CI)"=cc1_diff, "pMCMC"=round(as.numeric(cc1_p),3),check.names=FALSE)
-    
-    #Combine results
-    community = rbind(community,cc1)
+      # Continuous: give the gradient column a user-friendly axis label
+      colnames(comp_1$XDataNew)[1] <- comp_names[1]
+      composition_var <- comp_names[1]
+    } else {
+      # Categorical: replace internal factor codes with user-supplied names
+      comp_1$XDataNew[, 1] <- factor(comp_names, levels = comp_names)
+    }
+
+    # -------------------------------------------------------
+    # For each posterior sample, compute pairwise dissimilarity
+    # between real communities and between null communities, then
+    # take the difference (real - null).
+    # -------------------------------------------------------
+    n_iter         <- length(comp_1_predictions)
+    comp_res_list  <- vector("list", n_iter)   # raw dissimilarity, real communities
+    comp_diff_list <- vector("list", n_iter)   # real dissimilarity minus null dissimilarity
+
+    for(j in seq_len(n_iter)){
+
+      # Extract predicted community matrix for this posterior sample.
+      # Rows = gradient levels (sites); columns = species.
+      dissim  <- as.data.frame(comp_1_predictions[[j]])   # real community
+      dissimR <- as.data.frame(null_predictions[[j]])     # null community
+
+      # Back-transform if the response was modelled on a log scale.
+      # Only needed when the user manually log-transformed Y before
+      # fitting as a continuous response; not needed for Hmsc Poisson.
+      if(response_logged == TRUE) {
+        dissim  <- exp(dissim)  - 1
+        dissimR <- exp(dissimR) - 1
+      }
+
+      # Mapping from internal gradient row codes to display-level names
+      dissim_names <- data.frame(
+        code  = rownames(comp_1$XDataNew),
+        names = comp_1$XDataNew[, composition_var]
+      ) |>
+        mutate(across(where(is.numeric), ~round(., 1)))
+
+      # Pairwise dissimilarity between real predicted communities
+      real <- melt(
+        as.matrix(vegdist(dissim,  method = composition_metric)),
+        varnames   = c("code1", "code2"),
+        value.name = composition_metric
+      )
+
+      # Pairwise dissimilarity between null communities.
+      # Under the null, all rows of dissimR are independently sampled
+      # from the same community (focal covariate fixed), so this captures
+      # stochastic variation only — the baseline we compare against.
+      ran <- melt(
+        as.matrix(vegdist(dissimR, method = composition_metric)),
+        varnames   = c("code1", "code2"),
+        value.name = paste0(composition_metric, "_null")
+      )
+
+      # Difference = real dissimilarity - null dissimilarity.
+      # Positive values mean communities are MORE different than the
+      # null predicts: i.e., the focal covariate drives extra turnover.
+      tmp <- left_join(real, ran, by = c("code1", "code2")) |>
+        mutate(
+          diff    = .data[[composition_metric]] - .data[[paste0(composition_metric, "_null")]],
+          name_1  = dissim_names$names[match(code1, dissim_names$code)],
+          name_2  = dissim_names$names[match(code2, dissim_names$code)],
+          name_12 = paste0(name_1, " vs ", name_2)
+        ) |>
+        filter(name_1 != name_2) |>
+        dplyr::select(-c(code1, code2, name_1, name_2))
+
+      # Reshape to wide format: one column per community pair
+      comp_res_list[[j]]  <- tmp |>
+        dplyr::select(name_12, all_of(composition_metric)) |>
+        pivot_wider(names_from = name_12, values_from = all_of(composition_metric))
+
+      comp_diff_list[[j]] <- tmp |>
+        dplyr::select(name_12, diff) |>
+        pivot_wider(names_from = name_12, values_from = diff)
+    }
+
+    # Combine across posterior samples (rows = samples, columns = community pairs)
+    comp_res  <- do.call(rbind, comp_res_list)
+    comp_diff <- do.call(rbind, comp_diff_list)
+
+    # Remove samples where dissimilarity could not be computed
+    # (occurs when both communities have zero presence for all species)
+    comp_res  <- comp_res[ complete.cases(comp_res),  ]
+    comp_diff <- comp_diff[complete.cases(comp_diff), ]
+
+    # Select only the specified pairwise comparisons; keep all if not specified
+    if(is.null(community_comparisons[[i]]$composition_comp)) {
+      comp_res  <- as.mcmc(comp_res)
+      comp_diff <- as.mcmc(comp_diff)
+    } else {
+      comp_res  <- as.mcmc(comp_res[,  composition_comp, drop = FALSE])
+      comp_diff <- as.mcmc(comp_diff[, composition_comp, drop = FALSE])
+    }
+
+    # -------------------------------------------------------
+    # pMCMC for the difference from null
+    # -------------------------------------------------------
+    # Tests whether communities are credibly MORE dissimilar than the
+    # null model predicts. pMCMC < 0.05 means the focal covariate drives
+    # community turnover beyond what stochastic variation alone generates.
+    # The test is two-tailed: negative values (communities less dissimilar
+    # than null) would also give small pMCMC but indicate the opposite.
+    nC    <- ncol(as.matrix(comp_diff))
+    n_its <- nrow(as.matrix(comp_diff))
+    cc1_p <- pmax(0.5 / n_its,
+                  pmin(colSums(as.matrix(comp_diff)[, 1:nC, drop = FALSE] > 0) / n_its,
+                       1 - colSums(as.matrix(comp_diff)[, 1:nC, drop = FALSE] > 0) / n_its)) * 2
+
+    # Posterior mode and 95% HPD interval summaries
+    cc1_res  <- paste(round(posterior.mode(comp_res),  dec_PM), " (",
+                      round(HPDinterval(comp_res)[,  1], dec_PM), ", ",
+                      round(HPDinterval(comp_res)[,  2], dec_PM), ")", sep = "")
+    cc1_diff <- paste(round(posterior.mode(comp_diff), dec_PM), " (",
+                      round(HPDinterval(comp_diff)[, 1], dec_PM), ", ",
+                      round(HPDinterval(comp_diff)[, 2], dec_PM), ")", sep = "")
+
+    # Output table columns:
+    #   "Posterior Mode (CI)"             real dissimilarity between predicted communities
+    #   "Difference from Null ..."        real minus null dissimilarity; positive = focal
+    #                                     variable drives more turnover than chance
+    #   "pMCMC"                           probability that the difference is zero (two-tailed)
+    cc1 <- data.frame(
+      "Variable"                                 = composition_var,
+      "Community Comparison"                     = colnames(comp_res),
+      "Posterior Mode (CI)"                      = cc1_res,
+      "Difference from Null Posterior Mode (CI)" = cc1_diff,
+      "pMCMC"                                    = round(as.numeric(cc1_p), 3),
+      check.names = FALSE
+    )
+
+    community <- rbind(community, cc1)
   }
   
   #****************************************************
@@ -666,21 +703,8 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
       colnames(fixed_mod)<-tmp
     }
     
-    #P values using summary.MCMCglmm code
-    nG=dim(fixed_mod)[2]
-    #Pvalues = option to exclude 
-    if(any(pvalues_species == "include")) {
-      fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nG, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nG, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
-      fe1_p=round(as.numeric(fe1_p),3)
-    } else  {
-      if(any(pvalues_species == "exclude")) {
-        fe1_p=rep("-",length(fixed_names))
-      } else  {
-        fe1_p=pmax(0.5/dim(fixed_mod)[1], pmin(colSums(fixed_mod[,1:nG, drop = FALSE] > 0)/dim(fixed_mod)[1], 1 - colSums(fixed_mod[, 1:nG, drop = FALSE] > 0)/dim(fixed_mod)[1]))*2
-        fe1_p=round(as.numeric(fe1_p),3)
-        fe1_p[pvalues_species]<-"-"
-      }
-    }
+    nG    <- dim(fixed_mod)[2]
+    fe1_p <- calc_pmcmc(fixed_mod, pvalues_species, nG)
     
     fe1=paste(round(posterior.mode(fixed_mod),dec_PM)," (",round(HPDinterval(fixed_mod)[,1],dec_PM), ", ",round(HPDinterval(fixed_mod)[,2],dec_PM),")",sep="")
     fe1=data.frame(Fixed_Effects=colnames(fixed_mod),Estimates=fe1, pMCMC=fe1_p)
@@ -694,7 +718,7 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
       fixed=fe1
     } else  {
       #All differences between fixed effects: note this creates a matrix of all fixedeffects X all fixedeffects so will max out if there are many species.
-      fe2<-pairwise.diffs(fixed_mod,nF=nF)
+      fe2<-pairwise.diffs(fixed_mod,nF=nG)
       fixed=rbind(fe1,fe2)
       fixed = fixed %>% dplyr::filter(Fixed_Effects %in% c(fixed_names,fixed_diffinc_species) == T) %>% dplyr::select(Fixed_Effects,Estimates,pMCMC)
     }
@@ -703,38 +727,26 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     #Random effects ----
     #****************************************************
     if(Include_random_species == "yes") {
-    #matrix for placing estimates into
-    random_mod = matrix(nrow = model$samples*length(post_model$Omega[[1]]))
-    
-    for(i in 1:length(post_model$Omega)){
-      #combine chains 
-      tmp1 = do.call(rbind, post_model$Omega[[i]])
-      tmp2= matrix(nrow = dim(tmp1)[1], ncol =model$ns)
-      
-      #extract variances for each species for each random effect
-      for(j in 1:dim(tmp1)[1]){
-        tmp3 = matrix(tmp1[j,],nrow = model$ns, ncol =model$ns)
-        tmp3 = diag(tmp3)
-        tmp2[j,] = tmp3 
+      # Pre-allocate: rows = combined MCMC samples, cols = species × random effects
+      n_spp_samples <- nrow(do.call(rbind, post_model$Omega[[1]]))
+      random_mod    <- matrix(nrow = n_spp_samples,
+                              ncol = model$ns * length(post_model$Omega))
+
+      for(i in seq_along(post_model$Omega)){
+        tmp1 <- do.call(rbind, post_model$Omega[[i]])
+        # Vectorized diagonal extraction: each row of tmp1 is a flattened ns×ns
+        # covariance matrix; extract the diagonal (per-species variances) for each sample
+        tmp2 <- t(apply(tmp1, 1, function(row) diag(matrix(row, nrow = model$ns, ncol = model$ns))))
+        col_idx <- ((i - 1) * model$ns + 1):(i * model$ns)
+        random_mod[, col_idx] <- tmp2
       }
-      
-      random_mod = cbind(random_mod,tmp2)
-    }
-    random_mod = random_mod[,-1]
-    random_mod<-as.mcmc(random_mod)
-    
-    #Rename model random effects
-    if(is.null(random_names_species)) {
-      
-      random_names_species = character()
-      for(i in 1:length(model$rLNames)){
-        tmp = paste(model$rLNames[i],model$spNames,sep=": ")
-        random_names_species = c(random_names_species,tmp)
+      random_mod <- as.mcmc(random_mod)
+
+      # Name columns: random effect label : species name
+      if(is.null(random_names_species)) {
+        random_names_species <- unlist(lapply(model$rLNames, function(nm) paste(nm, model$spNames, sep = ": ")))
       }
-      colnames(random_mod)<-random_names_species
-    } else  {
-      colnames(random_mod)<-random_names_species
-    }
+      colnames(random_mod) <- random_names_species
     
       #Summary of variance components
       randomVarspp = paste(round(posterior.mode(random_mod),dec_PM)," (",round(HPDinterval(random_mod)[,1],dec_PM), ", ",round(HPDinterval(random_mod)[,2],dec_PM),")",sep="")
@@ -779,30 +791,28 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
 
     #Should they be outputted or not
     if(Include_random_species == "yes") {
-      writeData(workbook, sheet3, randomVarspp, startCol = 1, startRow = row_nums,headerStyle = hs2)
-      row_nums = row_nums + dim(randomVarspp)[1]+2
-    } else  {
+      writeData(workbook, sheet3, randomVarspp, startCol = 1, startRow = row_nums, headerStyle = hs2)
+      row_nums <- row_nums + dim(randomVarspp)[1] + 2
     }
 
-    #Bold pMCMC values less than 0.05
-    bolding<-createStyle(textDecoration="bold")
-    conditionalFormatting(workbook, sheet3, cols=3, rows=1:10000, rule="<0.05", style = bolding)
-    
+    bolding <- createStyle(textDecoration = "bold")
+    conditionalFormatting(workbook, sheet3, cols = 3, rows = 1:10000, rule = "<0.05", style = bolding)
+
     #****************************************************
     #Variance Partitioning (% variation) of explained by fixed and random effects for each species  ----
     #****************************************************
-      VP = as.data.frame(suppressWarnings(computeVariancePartitioning(model)$vals))
-      VP = VP %>% mutate(across(everything(), ~round(., 4)*100))
-      VP = data.frame("Variance Partitioning"=rownames(VP),"%"=VP,check.names=FALSE)
-      colnames(VP) = sub("%.","% ",colnames(VP))
-      rownames(VP)<-NULL
-    
+    # Reuses VP_all computed in Section 1 — no second call to computeVariancePartitioning
+    VP <- as.data.frame(VP_all)
+    VP <- VP |> mutate(across(everything(), ~round(., 4) * 100))
+    VP <- data.frame("Variance Partitioning" = rownames(VP), "%" = VP, check.names = FALSE)
+    colnames(VP) <- sub("%\\.", "% ", colnames(VP))   # fixed regex: escape the literal dot
+    rownames(VP) <- NULL
+
     #****************************************************
     #Species Fit statistics ----
     #****************************************************
-    # To assess model fit in terms of $R^2$, we apply the `evaluateModelFit` function to the posterior predictive distribution computed by the function `computePredictedValues`.
-    model_preds = computePredictedValues(model)
-    model_fit_spp = as.data.frame(evaluateModelFit(model, predY=model_preds))
+    # Reuses model_preds computed in Section 1 — no second call to computePredictedValues
+    model_fit_spp <- as.data.frame(evaluateModelFit(model, predY = model_preds))
     
     #Round fit stats
     model_fit_spp = model_fit_spp %>% mutate(across(everything(), ~round(., 2)))
@@ -834,10 +844,9 @@ HmscProc<-function(model=NULL,start_row=NULL,workbook=NULL, create_sheet="yes",s
     writeData(workbook, sheet4, model_fit_spp, startCol = 1, startRow = row_nums+1,headerStyle = hs2)
     #If species estimate != "include" then just returns a workbook with estimates averaged across species   
     return(workbook)
-  } else  {
   }
   }
-    return(workbook)  
+  return(workbook)
 }
 
 
@@ -961,8 +970,8 @@ hmsc_md <- function(data,stats=FALSE) {
           flextable::border(border.top = fp_border(color = "black", width = 1), part = "header") |>
           flextable::border(border.bottom = fp_border(color = "black", width = 1), part = "header") |>
           flextable::border(border.bottom = fp_border(color = "black", width = 1), i = nrow(data)) |>
-          set_table_properties(width=1,layout = "autofit",opts_html = list(scroll = list(height = "1000px", freeze_first_column = TRUE)),opts_word = list(keep_with_next = TRUE))
-          autofit(ft)
+          set_table_properties(width=1,layout = "autofit",opts_html = list(scroll = list(height = "1000px", freeze_first_column = TRUE)),opts_word = list(keep_with_next = TRUE)) |>
+          autofit()
   }
     else {
     ft <- flextable(data) |>
@@ -974,9 +983,8 @@ hmsc_md <- function(data,stats=FALSE) {
           flextable::border(border.top = fp_border(color = "black", width = 1), part = "header") |>
           flextable::border(border.bottom = fp_border(color = "black", width = 1), part = "header") |>
           flextable::border(border.bottom = fp_border(color = "black", width = 1), i = nrow(data)) |>
-          set_table_properties(width=1,layout = "autofit",opts_html = list(scroll = list(height = "1000px", freeze_first_column = TRUE)),opts_word = list(keep_with_next = TRUE))
-
-      autofit(ft)
+          set_table_properties(width=1,layout = "autofit",opts_html = list(scroll = list(height = "1000px", freeze_first_column = TRUE)),opts_word = list(keep_with_next = TRUE)) |>
+          autofit()
     }
     }
  }

@@ -28,7 +28,12 @@
 #Function for sampling of across trees using MCMCglmm models#
 #***************************************
 
-MCMCglmmTrees<-function(prior, treetoburn,data, mev=0,trees,tiplabel,fixed,random,residual,Gnumber,Rnumber,Geffects,Reffects,family="gaussian",samples=1000,nitts_tree,thins_tree,burns_tree,pr=FALSE,trunc = F){
+MCMCglmmTrees <- function(
+  prior, treetoburn, data, mev = 0, trees, tiplabel, fixed, random, residual,
+  Gnumber, Rnumber, Geffects, Reffects, family = "gaussian", samples = 1000,
+  nitts_tree, thins_tree, burns_tree, pr = FALSE, trunc = FALSE,
+  phylo_effect = NULL, inverse_tol = .Machine$double.eps^0.5
+) {
 # Explanation
 # prior #model prior
 # treetoburn #number of trees to discard before saving iterations
@@ -49,67 +54,115 @@ MCMCglmmTrees<-function(prior, treetoburn,data, mev=0,trees,tiplabel,fixed,rando
 # thins_tree
 # burns_tree
 
-#1. Create object to write model output to ----
-  tree1<-inverseA(trees[[1]])$Ainv
-  data$tiplabel<-tiplabel
-  
-  model<-MCMCglmm(fixed=fixed, random=random, rcov = residual,
-                  ginverse=list(tiplabel=tree1),family =family, data = data,prior=prior, 
-                  nitt=samples, burnin=0, thin=1,pr=pr,verbose = F,pl=T,trunc = F)
-  modeltmp<-model
-  
-  #2. Run model on each tree. Estimates of last tree provide start values for next tree. Use first treestoburn trees as a burnin. ----
-  trees<-trees[1:(samples+treetoburn)]#make sure list of trees is not longer than burnin + samples to be saved
-  
-  for(i in 1:length(trees)){
-    tree<-trees[[i]]
-    invtree<-inverseA(tree)$Ainv
-    
-    #Setup starting values
-    #**Liability design ----
-    liab_start <- list(Liab=modeltmp$Liab[1,])
-    
-    #**G design ----
-    G_start=list()
-    for(j in 1:Gnumber){
-      k=j-1
-      a=ifelse(j==1,1,1+sum(Geffects[1:k]))
-      b=sum(Geffects[1:j])
-      G=ifelse(Geffects[j]>1,
-               list(matrix(ncol=sqrt(Geffects[j]),nrow=sqrt(Geffects[j]),modeltmp$VCV[1,a:b])),
-               list(modeltmp$VCV[1,a:b]))
-      names(G)<-paste("G",j,sep="")
-      G_start=c(G_start,G)
+  stopifnot(
+    length(trees) > 0L, samples > 0, samples == as.integer(samples),
+    treetoburn >= 0, treetoburn == as.integer(treetoburn),
+    length(tiplabel) == nrow(data), !anyNA(tiplabel),
+    is.finite(inverse_tol), inverse_tol > 0
+  )
+
+  # The inverse name must match the factor actually used in the random formula.
+  # Do not silently attach a tiplabel inverse to an unrelated animal effect.
+  random_variables <- all.vars(random)
+  if (is.null(phylo_effect)) {
+    candidates <- intersect(c("animal", "tiplabel"), random_variables)
+    if (length(candidates) != 1L) {
+      stop("Specify phylo_effect: no unique animal/tiplabel random effect.")
     }
-    
-    #**R design ----
-    R_start=list()
-    for(j in 1:Rnumber){
-      glength=length(unlist(G_start))
-      k=j-1
-      a=ifelse(j==1,glength+1,(glength+1+sum(Reffects[1:k])))
-      b=glength+sum(Reffects[1:j])
-      R=ifelse(Reffects[j]>1,
-               list(matrix(ncol=sqrt(Reffects[j]),nrow=sqrt(Reffects[j]),modeltmp$VCV[1,a:b])),
-               list(modeltmp$VCV[1,a:b]))
-      names(R)<-paste("R",j,sep="")
-      R_start=c(R_start,R)
-    }
-    
-    #combine
-    start=list(Liab=liab_start,G=G_start,R=R_start)
-    
-    #3. Sample across trees ----
-    modeltmp<-MCMCglmm(fixed=fixed, random=random, rcov = residual,
-                       ginverse=list(tiplabel=invtree),family =family, data = data,prior=prior, 
-                       nitt=nitts_tree, thin=thins_tree,burnin=burns_tree, start=start, pr=pr,verbose = F,pl=T,trunc = F)
-    #saving after tree burnin
-    if(i>treetoburn){
-      model$VCV[i-treetoburn,]<-modeltmp$VCV[1,]
-      model$Sol[i-treetoburn,]<-modeltmp$Sol[1,]
-      model$Liab[i-treetoburn,]<-modeltmp$Liab[1,]
-    }
-    #print(i)
+    phylo_effect <- candidates
   }
+  if (length(phylo_effect) != 1L || !phylo_effect %in% random_variables) {
+    stop("phylo_effect must name a factor present in the random formula.")
+  }
+  data$tiplabel <- tiplabel
+  if (!phylo_effect %in% names(data) || !identical(
+    as.character(data[[phylo_effect]]), as.character(tiplabel)
+  )) {
+    stop("The phylogenetic random-effect values must match tiplabel by row.")
+  }
+
+  # Preserve the legacy order when enough distinct input trees are supplied.
+  # For 100 trees and 1,500 updates, shuffle complete equal-weight cycles;
+  # 500 warm-up updates and 1,000 retained updates remain unchanged.
+  updates <- as.integer(samples + treetoburn)
+  if (length(trees) >= updates) {
+    tree_indices <- seq_len(updates)
+  } else {
+    tree_indices <- integer(0)
+    for (cycle in seq_len(ceiling(updates / length(trees)))) {
+      tree_indices <- c(tree_indices, sample.int(length(trees)))
+    }
+    tree_indices <- tree_indices[seq_len(updates)]
+  }
+
+  tree1 <- MCMCglmm::inverseA(
+    trees[[tree_indices[1]]], tol = inverse_tol
+  )$Ainv
+  if (!all(as.character(tiplabel) %in% rownames(tree1))) {
+    stop("The input tree does not contain every analysis tiplabel.")
+  }
+  inverse_list <- setNames(list(tree1), phylo_effect)
+  model <- MCMCglmm::MCMCglmm(
+    fixed = fixed, random = random, rcov = residual,
+    ginverse = inverse_list, family = family, data = data, prior = prior,
+    nitt = samples, burnin = 0, thin = 1, pr = pr, verbose = FALSE,
+    pl = TRUE, trunc = FALSE
+  )
+  modeltmp <- model
+
+  for (i in seq_len(updates)) {
+    tree <- trees[[tree_indices[i]]]
+    invtree <- MCMCglmm::inverseA(tree, tol = inverse_tol)$Ainv
+    if (!all(as.character(tiplabel) %in% rownames(invtree))) {
+      stop("A sampled tree is missing analysis tiplabels.")
+    }
+    inverse_list <- setNames(list(invtree), phylo_effect)
+
+    # The package expects a liability vector, not a nested Liab list.
+    liab_start <- as.numeric(modeltmp$Liab[1, ])
+    G_start <- list()
+    for (j in seq_len(Gnumber)) {
+      a <- if (j == 1L) 1L else 1L + sum(Geffects[seq_len(j - 1L)])
+      b <- sum(Geffects[seq_len(j)])
+      G_start[[paste0("G", j)]] <- if (Geffects[j] > 1L) {
+        matrix(modeltmp$VCV[1, a:b], nrow = sqrt(Geffects[j]))
+      } else {
+        modeltmp$VCV[1, a:b]
+      }
+    }
+    R_start <- list()
+    glength <- sum(Geffects)
+    for (j in seq_len(Rnumber)) {
+      a <- glength + if (j == 1L) 1L else {
+        1L + sum(Reffects[seq_len(j - 1L)])
+      }
+      b <- glength + sum(Reffects[seq_len(j)])
+      R_start[[paste0("R", j)]] <- if (Reffects[j] > 1L) {
+        matrix(modeltmp$VCV[1, a:b], nrow = sqrt(Reffects[j]))
+      } else {
+        modeltmp$VCV[1, a:b]
+      }
+    }
+    start <- list(Liab = liab_start, G = G_start, R = R_start)
+
+    modeltmp <- MCMCglmm::MCMCglmm(
+      fixed = fixed, random = random, rcov = residual,
+      ginverse = inverse_list, family = family, data = data, prior = prior,
+      nitt = nitts_tree, thin = thins_tree, burnin = burns_tree,
+      start = start, pr = pr, verbose = FALSE, pl = TRUE, trunc = FALSE
+    )
+    if (i > treetoburn) {
+      model$VCV[i - treetoburn, ] <- modeltmp$VCV[1, ]
+      model$Sol[i - treetoburn, ] <- modeltmp$Sol[1, ]
+      model$Liab[i - treetoburn, ] <- modeltmp$Liab[1, ]
+    }
+  }
+  model$phylogeny_sampling <- list(
+    effect = phylo_effect, available_trees = length(trees),
+    warmup_updates = treetoburn, retained_updates = samples,
+    tree_indices = tree_indices,
+    retained_tree_indices = tree_indices[treetoburn + seq_len(samples)],
+    inverse_tolerance = inverse_tol
+  )
   return(model)
-}    
+}

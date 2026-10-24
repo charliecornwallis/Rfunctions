@@ -1,5 +1,25 @@
 **This repository contains functions for phylogenetic analyses**
 
+MCMCglmmTrees.R
+
+- Samples MCMCglmm models across trees, binding each inverse covariance to
+  the random factor actually used in the formula (`animal` or `tiplabel`).
+  Ambiguous names and row-label mismatches fail before fitting. Other factor
+  names can be selected explicitly with `phylo_effect`.
+- Existing argument order, defaults and output names are preserved. The
+  liability starting value is a numeric vector as required by MCMCglmm.
+  When enough trees are supplied, their original order is preserved; shorter
+  lists are reused in shuffled complete cycles using the caller's RNG stream.
+  The optional `inverse_tol` retains the package's original default.
+- `phylogeny_sampling` records the factor, tree indices and tolerance.
+  Existing saved fits are not changed by updating this helper.
+- Run `Rscript tests/test-MCMCglmmTrees.R` from this directory for 16 checks
+  and three bounded simulated fits, not a production convergence test.
+  Optional arguments select another helper copy and an evidence directory.
+  The 24 October 2026 repair matches the cooperation
+  project helper (SHA-256
+  `ad98c5374c6460e002c3afc93e45be6ae2368a651b8bfc1949f0d063ef92b155`).
+
 ASF_functions.R 
 - processes output from various models placing node estimates in dataframes facilitating parent descendent values
 
